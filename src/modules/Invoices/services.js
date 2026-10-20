@@ -1,6 +1,7 @@
 const Order = require("./model");
 const Client = require("../clients/model");
 const Seller = require("../sellers/model");
+const Product = require("../products/model");
 const ApiFeatures = require("../../utils/ApiFeatures");
 const ApiError = require("../../utils/ApiError");
 const generateCode = require("../../utils/GenerateCode");
@@ -646,6 +647,257 @@ const getTotalProfitforClient = async (req, res, next) => {
     }
 };
 
+// ==========================================
+// 10. Executive Analytics & Comprehensive Reports
+// ==========================================
+const getExecutiveAnalytics = async (req, res, next) => {
+    try {
+        const now = new Date();
+        const period = req.query.period || "month"; // "today" | "week" | "month" | "quarter" | "year"
+
+        let startDate;
+        if (period === "today") {
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+        } else if (period === "week") {
+            const dayOfWeek = now.getDay();
+            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dayOfWeek, 0, 0, 0);
+        } else if (period === "quarter") {
+            const quarterMonth = Math.floor(now.getMonth() / 3) * 3;
+            startDate = new Date(now.getFullYear(), quarterMonth, 1);
+        } else if (period === "year") {
+            startDate = new Date(now.getFullYear(), 0, 1);
+        } else {
+            // "month"
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        }
+
+        // 1. Overview Totals
+        const ordersAgg = await Order.aggregate([
+            { $match: { orderStatus: { $ne: "cancelled" } } },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: "$totalPrice" },
+                    totalPaid: { $sum: "$totalPaid" },
+                    ordersCount: { $sum: 1 },
+                },
+            },
+        ]);
+
+        const totalRevenue = ordersAgg[0]?.totalRevenue || 0;
+        const totalPaid = ordersAgg[0]?.totalPaid || 0;
+        const totalRemaining = Math.max(0, totalRevenue - totalPaid);
+        const collectionRate = totalRevenue > 0 ? Number(((totalPaid / totalRevenue) * 100).toFixed(1)) : 0;
+        const totalOrders = ordersAgg[0]?.ordersCount || 0;
+
+        // 2. Overdue Amount
+        const overdueAgg = await Order.aggregate([
+            {
+                $match: {
+                    orderStatus: { $ne: "cancelled" },
+                    paymentStatus: { $ne: "paid" },
+                    $or: [
+                        { paymentStatus: "overdue" },
+                        { dueDate: { $lt: now, $ne: null } },
+                    ],
+                },
+            },
+            {
+                $group: {
+                    _id: null,
+                    overdueAmount: { $sum: { $subtract: ["$totalPrice", "$totalPaid"] } },
+                    overdueCount: { $sum: 1 },
+                },
+            },
+        ]);
+        const overdueAmount = overdueAgg[0]?.overdueAmount || 0;
+        const overdueCount = overdueAgg[0]?.overdueCount || 0;
+
+        // 3. Last 6 Months Revenue Trend
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        const monthlyTrendAgg = await Order.aggregate([
+            {
+                $match: {
+                    createdAt: { $gte: sixMonthsAgo },
+                    orderStatus: { $ne: "cancelled" },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" },
+                    },
+                    revenue: { $sum: "$totalPrice" },
+                    collected: { $sum: "$totalPaid" },
+                    ordersCount: { $sum: 1 },
+                },
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } },
+        ]);
+
+        // 4. Sector / Territory Distribution
+        const sectorAgg = await Order.aggregate([
+            { $match: { orderStatus: { $ne: "cancelled" } } },
+            {
+                $lookup: {
+                    from: "sellers",
+                    localField: "seller",
+                    foreignField: "_id",
+                    as: "sellerDoc",
+                },
+            },
+            {
+                $unwind: { path: "$sellerDoc", preserveNullAndEmptyArrays: true },
+            },
+            {
+                $group: {
+                    _id: { $ifNull: ["$sellerDoc.sector", "المركز الرئيسي"] },
+                    revenue: { $sum: "$totalPrice" },
+                    collected: { $sum: "$totalPaid" },
+                    ordersCount: { $sum: 1 },
+                },
+            },
+            { $sort: { revenue: -1 } },
+        ]);
+
+        // 5. Top Best-Selling Products
+        const topProductsAgg = await Order.aggregate([
+            { $match: { orderStatus: { $ne: "cancelled" } } },
+            { $unwind: "$products" },
+            {
+                $group: {
+                    _id: "$products.productId",
+                    totalQuantity: { $sum: "$products.quantity" },
+                    totalSales: { $sum: { $multiply: ["$products.price", "$products.quantity"] } },
+                    unit: { $first: "$products.unit" },
+                },
+            },
+            { $sort: { totalSales: -1 } },
+            { $limit: 6 },
+            {
+                $lookup: {
+                    from: "products",
+                    localField: "_id",
+                    foreignField: "_id",
+                    as: "productDoc",
+                },
+            },
+            {
+                $unwind: { path: "$productDoc", preserveNullAndEmptyArrays: true },
+            },
+            {
+                $project: {
+                    _id: 1,
+                    name: { $ifNull: ["$productDoc.name", "منتج دهانات بتروكيما"] },
+                    code: { $ifNull: ["$productDoc.code", "PET-PROD"] },
+                    quantity: "$totalQuantity",
+                    revenue: "$totalSales",
+                    unit: { $ifNull: ["$unit", "بستلة"] },
+                },
+            },
+        ]);
+
+        // 6. Payment Methods Breakdown
+        const paymentMethodsAgg = await Order.aggregate([
+            { $unwind: "$payments" },
+            {
+                $group: {
+                    _id: "$payments.paymentMethod",
+                    totalAmount: { $sum: "$payments.amount" },
+                    transactionsCount: { $sum: 1 },
+                },
+            },
+            { $sort: { totalAmount: -1 } },
+        ]);
+
+        // 7. Top Sales Reps Performance
+        const topSellersAgg = await Seller.find({ status: "ACTIVE" })
+            .select("name sector monthlyTarget commissionRate clientCount avatar status")
+            .limit(6);
+
+        const topSellersWithSales = await Promise.all(
+            topSellersAgg.map(async (seller) => {
+                const sellerSalesAgg = await Order.aggregate([
+                    {
+                        $match: {
+                            seller: seller._id,
+                            orderStatus: { $ne: "cancelled" },
+                            createdAt: { $gte: startDate },
+                        },
+                    },
+                    {
+                        $group: {
+                            _id: null,
+                            sales: { $sum: "$totalPrice" },
+                            collected: { $sum: "$totalPaid" },
+                            ordersCount: { $sum: 1 },
+                        },
+                    },
+                ]);
+                const sales = sellerSalesAgg[0]?.sales || 0;
+                const collected = sellerSalesAgg[0]?.collected || 0;
+                const ordersCount = sellerSalesAgg[0]?.ordersCount || 0;
+                const target = seller.monthlyTarget || 500000;
+                const achievementRate = target > 0 ? Number(((sales / target) * 100).toFixed(1)) : 0;
+                return {
+                    _id: seller._id,
+                    name: seller.name,
+                    sector: seller.sector || "القاهرة الكبرى",
+                    sales,
+                    collected,
+                    target,
+                    achievementRate,
+                    ordersCount,
+                };
+            })
+        );
+
+        topSellersWithSales.sort((a, b) => b.sales - a.sales);
+
+        res.status(200).json({
+            status: "success",
+            data: {
+                period,
+                overview: {
+                    totalRevenue,
+                    totalPaid,
+                    totalRemaining,
+                    collectionRate,
+                    totalOrders,
+                    overdueAmount,
+                    overdueCount,
+                },
+                monthlyTrend: monthlyTrendAgg.map((m) => ({
+                    year: m._id.year,
+                    month: m._id.month,
+                    label: `${m._id.year}-${String(m._id.month).padStart(2, "0")}`,
+                    revenue: m.revenue,
+                    collected: m.collected,
+                    ordersCount: m.ordersCount,
+                })),
+                sectors: sectorAgg.map((s) => ({
+                    sector: s._id,
+                    revenue: s.revenue,
+                    collected: s.collected,
+                    ordersCount: s.ordersCount,
+                    share: totalRevenue > 0 ? Number(((s.revenue / totalRevenue) * 100).toFixed(1)) : 0,
+                })),
+                topProducts: topProductsAgg,
+                paymentMethods: paymentMethodsAgg.map((p) => ({
+                    method: p._id,
+                    amount: p.totalAmount,
+                    count: p.transactionsCount,
+                    share: totalPaid > 0 ? Number(((p.totalAmount / totalPaid) * 100).toFixed(1)) : 0,
+                })),
+                topSellers: topSellersWithSales,
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     createOrder,
     updateOrder,
@@ -659,4 +911,5 @@ module.exports = {
     updateOrderStatus,
     addPaymentToInvoice,
     getInvoicesDashboardStats,
+    getExecutiveAnalytics,
 };

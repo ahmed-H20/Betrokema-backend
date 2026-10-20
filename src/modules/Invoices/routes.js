@@ -9,6 +9,7 @@ const {
     updateOrderStatus,
     addPaymentToInvoice,
     getInvoicesDashboardStats,
+    getExecutiveAnalytics,
     getOrdersForSeller,
     getTotalProfitforSeller,
     getOrdersForClient,
@@ -17,8 +18,9 @@ const {
 
 const router = express.Router();
 
-// 1. Dashboard KPIs & Metrics (Admin / Manager)
+// 1. Dashboard KPIs & Executive Analytics (Admin / Manager)
 router.get("/stats", protect, allowedTo("admin", "manager"), getInvoicesDashboardStats);
+router.get("/analytics", optionalAuth, getExecutiveAnalytics);
 
 // 2. Seller specific routes (Admin / Manager / Seller)
 router.get("/seller/:sellerId", protect, allowedTo("admin", "manager", "seller"), getOrdersForSeller);

@@ -19,39 +19,39 @@ const {
 
 const router = express.Router();
 
-// All warehouse and inventory operations require admin or manager authorization
-router.use(protect, allowedTo("admin", "manager"));
+// All operations require authentication
+router.use(protect);
 
 // 1. Top 3 KPI Stats
-router.get("/stats", getWarehousesStats);
+router.get("/stats", allowedTo("admin", "manager", "seller"), getWarehousesStats);
 
 // 2. Export Inventory Report (Excel / Table format)
-router.get("/export", exportInventoryReport);
+router.get("/export", allowedTo("admin", "manager"), exportInventoryReport);
 
 // 3. Stock Transfers (المناقلات المخزنية)
 router.route("/transfers")
-    .get(getStockTransfers)
-    .post(createStockTransfer);
+    .get(allowedTo("admin", "manager", "seller"), getStockTransfers)
+    .post(allowedTo("admin", "manager"), createStockTransfer);
 
-router.patch("/transfers/:transferId/status", updateStockTransferStatus);
+router.patch("/transfers/:transferId/status", allowedTo("admin", "manager"), updateStockTransferStatus);
 
 // 4. Warehouse Specific Inventory Table & Assignment (جدول توزيع المنتجات والكميات)
 router.route("/:id/inventory")
-    .get(getWarehouseInventory)
-    .post(assignProductToWarehouse);
+    .get(allowedTo("admin", "manager", "seller"), getWarehouseInventory)
+    .post(allowedTo("admin", "manager"), assignProductToWarehouse);
 
 router.route("/:id/inventory/:itemId")
-    .put(updateWarehouseInventoryItem)
-    .delete(removeProductFromWarehouse);
+    .put(allowedTo("admin", "manager"), updateWarehouseInventoryItem)
+    .delete(allowedTo("admin", "manager"), removeProductFromWarehouse);
 
 // 5. Standard Warehouses List & CRUD
 router.route("/")
-    .get(getAllWarehouses)
-    .post(createWarehouse);
+    .get(allowedTo("admin", "manager", "seller"), getAllWarehouses)
+    .post(allowedTo("admin", "manager"), createWarehouse);
 
 router.route("/:id")
-    .get(getWarehouseById)
-    .put(updateWarehouse)
-    .delete(deleteWarehouse);
+    .get(allowedTo("admin", "manager", "seller"), getWarehouseById)
+    .put(allowedTo("admin", "manager"), updateWarehouse)
+    .delete(allowedTo("admin", "manager"), deleteWarehouse);
 
 module.exports = router;
