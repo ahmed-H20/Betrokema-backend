@@ -27,7 +27,7 @@ dbConnecting();
 
 // Middleware
 app.use(cors());
-app.use(morgan("development"));
+app.use(morgan("dev"));
 app.use(express.json());
 
 // Serve static uploaded files

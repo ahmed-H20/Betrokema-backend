@@ -63,7 +63,7 @@ const getSellersDashboardStats = async (req, res, next) => {
         const lastMonthSales = lastMonthSalesAgg[0]?.totalSales || 0;
         const salesGrowthRate = lastMonthSales > 0
             ? Number((((currentMonthSales - lastMonthSales) / lastMonthSales) * 100).toFixed(1))
-            : null;
+            : 0;
 
         // 3. Target Achievement Rate
         const targetAchievementRate = teamMonthlyTarget > 0
