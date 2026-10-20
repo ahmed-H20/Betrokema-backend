@@ -173,35 +173,40 @@ const getClientsForSeller = async (req, res, next) => {
     }
 };
 
-// 6. Update Client Credit & Debt (تعديل الائتمان والمديونية)
+// 6. Update Client Credit & Debt (تعديل الائتمان والمديونية بدقة تلقائية)
 const updateClientCreditDebt = async (req, res, next) => {
     try {
-        const { creditLimit, currentDebt, paymentStatus } = req.body;
-        const updateFields = {};
-
-        if (creditLimit !== undefined) updateFields.creditLimit = creditLimit;
-        if (currentDebt !== undefined) updateFields.currentDebt = currentDebt;
-        if (paymentStatus !== undefined) updateFields.paymentStatus = paymentStatus;
-
-        if (updateFields.currentDebt !== undefined && updateFields.creditLimit !== undefined) {
-            if (updateFields.currentDebt > updateFields.creditLimit) {
-                updateFields.paymentStatus = "over_credit";
-            }
-        }
-
-        const client = await Client.findByIdAndUpdate(req.params.id, updateFields, {
-            new: true,
-            runValidators: true,
-        }).populate("seller", "name phone code");
-
+        const client = await Client.findById(req.params.id);
         if (!client) {
             return next(new ApiError(`العميل غير موجود: ${req.params.id}`, 404));
         }
 
+        const { creditLimit, currentDebt, paymentStatus } = req.body;
+
+        if (creditLimit !== undefined) client.creditLimit = Number(creditLimit);
+        if (currentDebt !== undefined) client.currentDebt = Number(currentDebt);
+
+        // Auto-recalculate status dynamically based on current values
+        if (paymentStatus !== undefined) {
+            client.paymentStatus = paymentStatus;
+        } else {
+            if (client.currentDebt > client.creditLimit) {
+                client.paymentStatus = "over_credit";
+            } else if (client.currentDebt === 0) {
+                client.paymentStatus = "settled";
+            } else if (client.paymentStatus === "over_credit") {
+                client.paymentStatus = "regular";
+            }
+        }
+
+        await client.save();
+
+        const populated = await Client.findById(client._id).populate("seller", "name phone code");
+
         res.status(200).json({
             status: "success",
             message: "تم تحديث البيانات المالية للعميل بنجاح",
-            data: client,
+            data: populated,
         });
     } catch (err) {
         next(err);

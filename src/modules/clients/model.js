@@ -51,6 +51,31 @@ const clientSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
+        gpsLocation: {
+            lat: {
+                type: Number,
+                default: null,
+            },
+            lng: {
+                type: Number,
+                default: null,
+            },
+        },
+        deliveryNotes: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        commercialReg: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+        taxNumber: {
+            type: String,
+            trim: true,
+            default: "",
+        },
         tier: {
             type: String,
             default: "عميل عام",

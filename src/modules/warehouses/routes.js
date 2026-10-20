@@ -1,4 +1,5 @@
 const express = require("express");
+const { protect, allowedTo } = require("../../middlewares/auth");
 const {
     getWarehousesStats,
     getAllWarehouses,
@@ -17,6 +18,9 @@ const {
 } = require("./services");
 
 const router = express.Router();
+
+// All warehouse and inventory operations require admin or manager authorization
+router.use(protect, allowedTo("admin", "manager"));
 
 // 1. Top 3 KPI Stats
 router.get("/stats", getWarehousesStats);

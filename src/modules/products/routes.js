@@ -1,4 +1,5 @@
 const express = require("express");
+const { protect, allowedTo } = require("../../middlewares/auth");
 const {
     getProductsDashboardStats,
     getFeaturedProduct,
@@ -14,27 +15,27 @@ const {
 
 const router = express.Router();
 
-// 1. Dashboard Inventory Stats & KPIs
-router.get("/stats", getProductsDashboardStats);
+// 1. Dashboard Inventory Stats & KPIs (Admin / Staff)
+router.get("/stats", protect, allowedTo("admin", "manager"), getProductsDashboardStats);
 
-// 2. Featured / Best Seller Product for Hero Banner
+// 2. Featured / Best Seller Product for Hero Banner (Public)
 router.get("/featured", getFeaturedProduct);
 
-// 3. Products by Category
+// 3. Products by Category (Public)
 router.get("/category/:category", getProductsByCategory);
 
-// 4. Quick Actions (Buttons in product cards)
-router.patch("/:id/stock-price", updateProductStockAndPrice);
-router.post("/:id/supply-order", quickSupplyRequest);
+// 4. Quick Actions (Admin / Manager only)
+router.patch("/:id/stock-price", protect, allowedTo("admin", "manager"), updateProductStockAndPrice);
+router.post("/:id/supply-order", protect, allowedTo("admin", "manager"), quickSupplyRequest);
 
 // 5. Standard CRUD
 router.route("/")
     .get(getAllProducts)
-    .post(createProduct);
+    .post(protect, allowedTo("admin", "manager"), createProduct);
 
 router.route("/:id")
     .get(getProductById)
-    .put(updateProduct)
-    .delete(deleteProduct);
+    .put(protect, allowedTo("admin", "manager"), updateProduct)
+    .delete(protect, allowedTo("admin", "manager"), deleteProduct);
 
 module.exports = router;

@@ -102,13 +102,25 @@ const updateCategory = async (req, res, next) => {
     }
 };
 
-// 5. Delete Category
+// 5. Delete Category (With Orphan Prevention)
 const deleteCategory = async (req, res, next) => {
     try {
-        const category = await Category.findByIdAndDelete(req.params.id);
+        const category = await Category.findById(req.params.id);
         if (!category) {
             return next(new ApiError("التصنيف غير موجود", 404));
         }
+
+        const linkedProductsCount = await Product.countDocuments({ category: req.params.id });
+        if (linkedProductsCount > 0) {
+            return next(
+                new ApiError(
+                    `لا يمكن حذف التصنيف (${category.name}) لوجود ${linkedProductsCount} منتج مرتبط به في الكتالوج. يرجى نقل أو حذف المنتجات المرتبطة به أولاً`,
+                    400
+                )
+            );
+        }
+
+        await Category.findByIdAndDelete(req.params.id);
         res.status(200).json({
             status: "success",
             message: "تم حذف التصنيف بنجاح",

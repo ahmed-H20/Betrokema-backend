@@ -241,6 +241,10 @@ const stockTransferSchema = new mongoose.Schema(
         completedAt: {
             type: Date,
         },
+        isStockApplied: {
+            type: Boolean,
+            default: false,
+        },
     },
     {
         timestamps: true,

@@ -1,5 +1,5 @@
 const express = require("express");
-const { optionalAuth } = require("../../middlewares/auth");
+const { protect, allowedTo, optionalAuth } = require("../../middlewares/auth");
 const {
     getAllOrders,
     getOrderById,
@@ -17,29 +17,29 @@ const {
 
 const router = express.Router();
 
-// 1. Dashboard KPIs & Metrics
-router.get("/stats", getInvoicesDashboardStats);
+// 1. Dashboard KPIs & Metrics (Admin / Manager)
+router.get("/stats", protect, allowedTo("admin", "manager"), getInvoicesDashboardStats);
 
-// 2. Seller specific routes
-router.get("/seller/:sellerId", getOrdersForSeller);
-router.get("/seller/:sellerId/profit", getTotalProfitforSeller);
+// 2. Seller specific routes (Admin / Manager / Seller)
+router.get("/seller/:sellerId", protect, allowedTo("admin", "manager", "seller"), getOrdersForSeller);
+router.get("/seller/:sellerId/profit", protect, allowedTo("admin", "manager", "seller"), getTotalProfitforSeller);
 
-// 3. Client specific routes
-router.get("/client/:clientId", getOrdersForClient);
-router.get("/client/:clientId/profit", getTotalProfitforClient);
+// 3. Client specific routes (Admin / Manager / Client)
+router.get("/client/:clientId", protect, allowedTo("admin", "manager", "client"), getOrdersForClient);
+router.get("/client/:clientId/profit", protect, allowedTo("admin", "manager", "client"), getTotalProfitforClient);
 
 // 4. Status Action & Payment Sub-resources
-router.patch("/:id/status", updateOrderStatus);
-router.post("/:id/payments", addPaymentToInvoice);
+router.patch("/:id/status", protect, allowedTo("admin", "manager", "seller"), updateOrderStatus);
+router.post("/:id/payments", protect, allowedTo("admin", "manager", "seller"), addPaymentToInvoice);
 
-// 4. Standard CRUD Endpoints
+// 5. Standard CRUD Endpoints
 router.route("/")
     .get(optionalAuth, getAllOrders)
     .post(optionalAuth, createOrder);
 
 router.route("/:id")
-    .get(getOrderById)
-    .put(updateOrder)
-    .delete(deleteOrder);
+    .get(optionalAuth, getOrderById)
+    .put(protect, allowedTo("admin", "manager", "seller"), updateOrder)
+    .delete(protect, allowedTo("admin", "manager"), deleteOrder);
 
 module.exports = router;

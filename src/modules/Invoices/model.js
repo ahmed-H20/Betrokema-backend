@@ -32,10 +32,23 @@ const paymentSchema = new mongoose.Schema(
             type: String,
             enum: [
                 "deposit",
+                "advance",
                 "installment",
                 "final_payment",
+                "final_settlement",
             ],
             required: true,
+        },
+
+        referenceNumber: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
+        chequeDueDate: {
+            type: Date,
+            default: null,
         },
 
         notes: {

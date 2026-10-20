@@ -15,6 +15,10 @@ const categoryRouter = require("./src/modules/categores/routes");
 const sellerRouter = require("./src/modules/sellers/routes");
 const userRouter = require("./src/modules/users/routes");
 const warehouseRouter = require("./src/modules/warehouses/routes");
+const uploadRouter = require("./src/modules/upload/routes");
+const path = require("path");
+
+const cors = require("cors");
 
 const app = express();
 
@@ -22,8 +26,12 @@ const app = express();
 dbConnecting();
 
 // Middleware
+app.use(cors());
 app.use(morgan("development"));
 app.use(express.json());
+
+// Serve static uploaded files
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // Mount Routes
 app.use("/api/v1/auth", authRouter);
@@ -34,6 +42,7 @@ app.use("/api/v1/categories", categoryRouter);
 app.use("/api/v1/sellers", sellerRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/warehouses", warehouseRouter);
+app.use("/api/v1/upload", uploadRouter);
 
 app.use("/test", (req, res) => {
     res.json({ message: "hello world" });

@@ -169,13 +169,24 @@ const createOrder = async (req, res, next) => {
 
         const code = await generateCode(Order, "INV");
 
-        // Auto-calculate totalPrice from products if not provided
-        if (!req.body.totalPrice && Array.isArray(req.body.products)) {
-            req.body.totalPrice = req.body.products.reduce((acc, item) => {
-                const itemTotal = item.totalPrice || (item.price * item.quantity);
+        // Validate and calculate accurate totalPrice from line items
+        let calculatedProductsTotal = 0;
+        if (Array.isArray(req.body.products)) {
+            req.body.products.forEach((item) => {
+                const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
                 item.totalPrice = itemTotal;
-                return acc + itemTotal;
-            }, 0);
+                calculatedProductsTotal += itemTotal;
+            });
+        }
+
+        const taxAmount = Number(req.body.taxAmount) || 0;
+        const finalTotalPrice = calculatedProductsTotal + taxAmount;
+        req.body.totalPrice = finalTotalPrice > 0 ? finalTotalPrice : (Number(req.body.totalPrice) || 0);
+
+        if (req.body.totalPaid && Number(req.body.totalPaid) >= req.body.totalPrice) {
+            req.body.paymentStatus = "paid";
+        } else if (req.body.totalPaid && Number(req.body.totalPaid) > 0) {
+            req.body.paymentStatus = "partially_paid";
         }
 
         const order = await Order.create({
@@ -246,31 +257,56 @@ const deleteOrder = async (req, res, next) => {
 };
 
 // ==========================================
-// 6. Quick Action: Update Order Status (e.g. اعتماد توريد)
+// 6. Quick Action: Update Order Status (With Status Lifecycle Validation)
 // ==========================================
 const updateOrderStatus = async (req, res, next) => {
     try {
         const { orderStatus } = req.body;
-        if (!orderStatus) {
-            return next(new ApiError("حالة الطلب الجديدة مطلوبة", 400));
+        const validStatuses = ["pending", "processing", "completed", "cancelled"];
+        if (!orderStatus || !validStatuses.includes(orderStatus)) {
+            return next(
+                new ApiError(
+                    `حالة الطلب غير صالحة. الحالات المسموحة: ${validStatuses.join(", ")}`,
+                    400
+                )
+            );
         }
 
-        const order = await Order.findByIdAndUpdate(
-            req.params.id,
-            { orderStatus },
-            { new: true, runValidators: true }
-        )
-            .populate("client")
-            .populate("seller");
-
-        if (!order) {
+        const existingOrder = await Order.findById(req.params.id);
+        if (!existingOrder) {
             return next(new ApiError(`لا توجد فاتورة بهذا الرقم: ${req.params.id}`, 404));
         }
+
+        // Prevent moving cancelled orders back to completed without a formal procedure
+        if (existingOrder.orderStatus === "cancelled" && orderStatus === "completed") {
+            return next(new ApiError("لا يمكن تحويل فاتورة ملغاة إلى مكتملة مباشرة", 400));
+        }
+
+        const previousStatus = existingOrder.orderStatus;
+        existingOrder.orderStatus = orderStatus;
+        await existingOrder.save();
+
+        // If order became completed and client has an unpaid balance, update client debt
+        if (orderStatus === "completed" && previousStatus !== "completed" && existingOrder.client) {
+            const clientDoc = await Client.findById(existingOrder.client);
+            if (clientDoc) {
+                const unpaid = Math.max(0, (existingOrder.totalPrice || 0) - (existingOrder.totalPaid || 0));
+                clientDoc.currentDebt = (clientDoc.currentDebt || 0) + unpaid;
+                if (clientDoc.currentDebt > (clientDoc.creditLimit || 0)) {
+                    clientDoc.paymentStatus = "over_credit";
+                }
+                await clientDoc.save();
+            }
+        }
+
+        const populated = await Order.findById(existingOrder._id)
+            .populate("client")
+            .populate("seller");
 
         res.status(200).json({
             status: "success",
             message: `تم تغيير حالة الفاتورة إلى ${orderStatus}`,
-            data: order,
+            data: populated,
         });
     } catch (err) {
         next(err);
@@ -278,14 +314,25 @@ const updateOrderStatus = async (req, res, next) => {
 };
 
 // ==========================================
-// 7. Add Payment to Invoice (تسجيل دفعة جديدة)
+// 7. Add Payment to Invoice (With Overflow Guard & Client Debt Sync)
 // ==========================================
 const addPaymentToInvoice = async (req, res, next) => {
     try {
-        const { amount, paymentMethod, paymentType, notes, receivedBy, receiverName, paymentDate } = req.body;
+        const {
+            amount,
+            paymentMethod,
+            paymentType,
+            referenceNumber,
+            chequeDueDate,
+            notes,
+            receivedBy,
+            receiverName,
+            paymentDate,
+        } = req.body;
 
-        if (!amount || amount <= 0) {
-            return next(new ApiError("المبلغ المدفوع يجب أن يكون أكبر من صفر", 400));
+        const paymentNum = Number(amount);
+        if (!paymentNum || paymentNum <= 0) {
+            return next(new ApiError("المبلغ المدفوع يجب أن يكون رقماً أكبر من صفر", 400));
         }
         if (!paymentMethod) {
             return next(new ApiError("طريقة الدفع مطلوبة", 400));
@@ -301,16 +348,33 @@ const addPaymentToInvoice = async (req, res, next) => {
 
         const currentPaid = order.totalPaid || 0;
         const totalPrice = order.totalPrice || 0;
-        const newTotalPaid = currentPaid + Number(amount);
+        const remainingAmount = Math.max(0, totalPrice - currentPaid);
+
+        if (remainingAmount <= 0) {
+            return next(new ApiError("هذه الفاتورة مسددة بالكامل بالفعل ولا توجد أي متبقيات للتحصيل", 400));
+        }
+
+        if (paymentNum > remainingAmount) {
+            return next(
+                new ApiError(
+                    `قيمة الدفعة (${paymentNum} ج.م) تتجاوز إجمالي المبلغ المتبقي على الفاتورة (${remainingAmount} ج.م)`,
+                    400
+                )
+            );
+        }
+
+        const newTotalPaid = currentPaid + paymentNum;
 
         // Add payment to payments array
         order.payments.push({
-            amount: Number(amount),
+            amount: paymentNum,
             paymentMethod,
             paymentType,
+            referenceNumber: referenceNumber ? String(referenceNumber).trim() : "",
+            chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : null,
             notes: notes || "",
-            receivedBy: receivedBy || null,
-            receiverName: receiverName || "الخزينة المركزية",
+            receivedBy: receivedBy || req.user?._id || null,
+            receiverName: receiverName || req.user?.name || "الخزينة المركزية",
             paymentDate: paymentDate || new Date(),
         });
 
@@ -325,6 +389,20 @@ const addPaymentToInvoice = async (req, res, next) => {
         }
 
         await order.save();
+
+        // Safely adjust client currentDebt
+        if (order.client) {
+            const clientDoc = await Client.findById(order.client);
+            if (clientDoc) {
+                clientDoc.currentDebt = Math.max(0, (clientDoc.currentDebt || 0) - paymentNum);
+                if (clientDoc.currentDebt === 0) {
+                    clientDoc.paymentStatus = "settled";
+                } else if (clientDoc.currentDebt <= (clientDoc.creditLimit || 0) && clientDoc.paymentStatus === "over_credit") {
+                    clientDoc.paymentStatus = "regular";
+                }
+                await clientDoc.save();
+            }
+        }
 
         const populatedOrder = await Order.findById(order._id)
             .populate("client")
@@ -416,7 +494,11 @@ const getInvoicesDashboardStats = async (req, res, next) => {
 
         const collectedToday = todayPaymentsAgg[0]?.collectedToday || 0;
         const settlementsCount = todayPaymentsAgg[0]?.settlementsCount || 0;
-        const targetToday = 250000;
+        // Dynamic daily target computed from active field reps monthly targets divided by month days
+        const activeSellers = await Seller.find({ status: "ACTIVE" }).select("monthlyTarget");
+        const totalTeamTarget = activeSellers.reduce((sum, s) => sum + (s.monthlyTarget || 500000), 0);
+        const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const targetToday = totalTeamTarget > 0 ? Math.round(totalTeamTarget / daysInCurrentMonth) : 250000;
         const collectedPercentage = targetToday > 0
             ? Number(((collectedToday / targetToday) * 100).toFixed(1))
             : 0;

@@ -63,7 +63,7 @@ const getSellersDashboardStats = async (req, res, next) => {
         const lastMonthSales = lastMonthSalesAgg[0]?.totalSales || 0;
         const salesGrowthRate = lastMonthSales > 0
             ? Number((((currentMonthSales - lastMonthSales) / lastMonthSales) * 100).toFixed(1))
-            : 14.2;
+            : null;
 
         // 3. Target Achievement Rate
         const targetAchievementRate = teamMonthlyTarget > 0
@@ -73,14 +73,24 @@ const getSellersDashboardStats = async (req, res, next) => {
         const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
         const daysRemaining = Math.max(0, daysInMonth - now.getDate());
 
-        // 4. Clients Activity Stats
+        // 4. Clients Activity Stats (Real calculation based on 30-day orders)
         const oneWeekAgo = new Date();
         oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        const [totalClients, newClientsThisWeek] = await Promise.all([
+        const [totalClients, newClientsThisWeek, activeClientIds] = await Promise.all([
             Client.countDocuments(),
             Client.countDocuments({ createdAt: { $gte: oneWeekAgo } }),
+            Order.distinct("client", {
+                createdAt: { $gte: thirtyDaysAgo },
+                orderStatus: { $ne: "cancelled" },
+            }),
         ]);
+
+        const realActivityRate = totalClients > 0
+            ? Math.round((activeClientIds.length / totalClients) * 100)
+            : 0;
 
         res.status(200).json({
             status: "success",
@@ -104,7 +114,7 @@ const getSellersDashboardStats = async (req, res, next) => {
                 activeFieldClients: {
                     total: totalClients,
                     newThisWeek: newClientsThisWeek,
-                    activityRate: 92,
+                    activityRate: realActivityRate,
                 },
             },
         });
@@ -114,7 +124,7 @@ const getSellersDashboardStats = async (req, res, next) => {
 };
 
 // ==========================================
-// 2. Get All Sellers (With Performance, Targets & Filters)
+// 2. Get All Sellers (With Performance, Targets & Filters + Pagination)
 // ==========================================
 const getAllSellers = async (req, res, next) => {
     try {
@@ -140,7 +150,15 @@ const getAllSellers = async (req, res, next) => {
             ];
         }
 
-        const sellers = await Seller.find(filterObj);
+        const totalSellers = await Seller.countDocuments(filterObj);
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Number(req.query.limit) ? Math.max(1, Number(req.query.limit)) : (req.query.page ? 10 : 0);
+
+        let query = Seller.find(filterObj);
+        if (limit > 0) {
+            query = query.skip((page - 1) * limit).limit(limit);
+        }
+        const sellers = await query;
 
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -191,6 +209,12 @@ const getAllSellers = async (req, res, next) => {
         res.status(200).json({
             status: "success",
             results: enrichedSellers.length,
+            pagination: {
+                total: totalSellers,
+                page,
+                limit: limit || totalSellers,
+                pages: limit > 0 ? Math.ceil(totalSellers / limit) : 1,
+            },
             data: enrichedSellers,
         });
     } catch (err) {
@@ -211,8 +235,11 @@ const getSellerPerformance = async (req, res, next) => {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-        const [monthOrdersAgg, clientsCount, totalInvoicesCount] = await Promise.all([
+        const [monthOrdersAgg, todayOrdersAgg, clientsCount, totalInvoicesCount] = await Promise.all([
             Order.aggregate([
                 {
                     $match: {
@@ -229,6 +256,22 @@ const getSellerPerformance = async (req, res, next) => {
                     },
                 },
             ]),
+            Order.aggregate([
+                {
+                    $match: {
+                        seller: seller._id,
+                        createdAt: { $gte: startOfDay, $lte: endOfDay },
+                        orderStatus: { $ne: "cancelled" },
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalPrice: { $sum: "$totalPrice" },
+                        count: { $sum: 1 },
+                    },
+                },
+            ]),
             Client.countDocuments({ seller: seller._id }),
             Order.countDocuments({ seller: seller._id }),
         ]);
@@ -239,7 +282,14 @@ const getSellerPerformance = async (req, res, next) => {
         const achievementRate = target > 0 ? Number(((currentMonthSales / target) * 100).toFixed(1)) : 0;
         const commissionRate = seller.commissionRate || 6;
         const commissionAmount = Math.round(currentMonthSales * (commissionRate / 100));
-        const collectionRate = currentMonthSales > 0 ? Math.round((totalPaidMonth / currentMonthSales) * 100) : 91;
+        const collectionRate = currentMonthSales > 0 ? Math.round((totalPaidMonth / currentMonthSales) * 100) : 0;
+
+        // Daily performance metrics (for petrokema_mobile_4 & rep daily tracking)
+        const todaySales = todayOrdersAgg[0]?.totalPrice || 0;
+        const todayOrdersCount = todayOrdersAgg[0]?.count || 0;
+        const dailyTarget = target > 0 ? Math.round(target / daysInMonth) : 0;
+        const todayAchievementRate = dailyTarget > 0 ? Number(((todaySales / dailyTarget) * 100).toFixed(1)) : 0;
+        const remainingTodayTarget = Math.max(0, dailyTarget - todaySales);
 
         res.status(200).json({
             status: "success",
@@ -254,6 +304,11 @@ const getSellerPerformance = async (req, res, next) => {
                     collectionRate,
                     clientsCount,
                     totalInvoicesCount,
+                    todaySales,
+                    todayOrdersCount,
+                    dailyTarget,
+                    todayAchievementRate,
+                    remainingTodayTarget,
                 },
             },
         });
@@ -347,14 +402,30 @@ const updateSeller = async (req, res, next) => {
 };
 
 // ==========================================
-// 7. Delete Seller
+// 7. Delete Seller (With Orphan Prevention)
 // ==========================================
 const deleteSeller = async (req, res, next) => {
     try {
-        const seller = await Seller.findByIdAndDelete(req.params.id);
+        const seller = await Seller.findById(req.params.id);
         if (!seller) {
             return next(new ApiError(`المندوب غير موجود: ${req.params.id}`, 404));
         }
+
+        const [clientsCount, ordersCount] = await Promise.all([
+            Client.countDocuments({ seller: req.params.id }),
+            Order.countDocuments({ seller: req.params.id }),
+        ]);
+
+        if (clientsCount > 0 || ordersCount > 0) {
+            return next(
+                new ApiError(
+                    `لا يمكن حذف المندوب (${seller.name}) لوجود ${clientsCount} عميل و ${ordersCount} فاتورة مرتبطة به في النظام. يمكنك تعليق حسابه (SUSPENDED) بدلاً من الحذف حفاظاً على السجلات المالية`,
+                    400
+                )
+            );
+        }
+
+        await Seller.findByIdAndDelete(req.params.id);
         if (seller.user) {
             await User.findByIdAndDelete(seller.user);
         }

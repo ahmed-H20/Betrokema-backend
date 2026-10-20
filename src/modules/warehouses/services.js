@@ -13,13 +13,11 @@ const getWarehousesStats = async (req, res, next) => {
         const totalWarehouses = warehouses.length;
         const activeWarehouses = warehouses.filter((w) => w.isActive).length;
         const warehouseNames = warehouses.map((w) => {
-            // Shorten name e.g. "مستودع العاشر من رمضان المركزي" -> "العاشر"
-            const name = w.name;
-            if (name.includes("العاشر")) return "العاشر";
-            if (name.includes("السادات")) return "السادات";
-            if (name.includes("برج العرب")) return "برج العرب";
-            if (name.includes("أسيوط")) return "أسيوط";
-            return w.governorate || name.split(" ")[1] || name;
+            const clean = (w.name || "")
+                .replace(/^مستودع\s+/i, "")
+                .replace(/\s+(المركزي|الإقليمي|الساحلي|للصعيد|للمواد الخام)/gi, "")
+                .trim();
+            return clean || w.governorate || w.name;
         });
 
         // 2. Stock and Chemicals summary
@@ -116,10 +114,19 @@ const getAllWarehouses = async (req, res, next) => {
             ];
         }
 
-        const [warehouses, totalAll, totalActive] = await Promise.all([
-            Warehouse.find(query).sort({ createdAt: -1 }),
+        const page = Math.max(1, Number(req.query.page) || 1);
+        const limit = Number(req.query.limit) ? Math.max(1, Number(req.query.limit)) : (req.query.page ? 10 : 0);
+
+        let whQuery = Warehouse.find(query).sort({ createdAt: -1 });
+        if (limit > 0) {
+            whQuery = whQuery.skip((page - 1) * limit).limit(limit);
+        }
+
+        const [warehouses, totalAll, totalActive, filteredCount] = await Promise.all([
+            whQuery,
             Warehouse.countDocuments(),
             Warehouse.countDocuments({ isActive: true }),
+            Warehouse.countDocuments(query),
         ]);
 
         const formattedWarehouses = warehouses.map((w) => {
@@ -138,6 +145,12 @@ const getAllWarehouses = async (req, res, next) => {
             counts: {
                 all: totalAll,
                 active: totalActive,
+            },
+            pagination: {
+                total: filteredCount,
+                page,
+                limit: limit || filteredCount,
+                pages: limit > 0 ? Math.ceil(filteredCount / limit) : 1,
             },
             data: formattedWarehouses,
         });
@@ -417,10 +430,20 @@ const assignProductToWarehouse = async (req, res, next) => {
         else if (stockNum > reorderNum * 3) stockStatus = "متوفر بكثافة";
 
         if (existingItemIndex > -1) {
-            // Update existing assignment
-            warehouse.inventory[existingItemIndex].currentStock = stockNum;
+            // If replace flag is explicitly set, overwrite; otherwise add incrementally
+            const isReplace = req.body.replace === true || req.body.mode === "replace" || req.body.mode === "overwrite";
+            const updatedStock = isReplace
+                ? stockNum
+                : (warehouse.inventory[existingItemIndex].currentStock || 0) + stockNum;
+
+            let updatedStatus = "متوفر";
+            if (updatedStock === 0) updatedStatus = "نفد الرصيد";
+            else if (updatedStock <= reorderNum) updatedStatus = "رصيد حرج (إعادة طلب)";
+            else if (updatedStock > reorderNum * 3) updatedStatus = "متوفر بكثافة";
+
+            warehouse.inventory[existingItemIndex].currentStock = updatedStock;
             warehouse.inventory[existingItemIndex].reorderLevel = reorderNum;
-            warehouse.inventory[existingItemIndex].stockStatus = stockStatus;
+            warehouse.inventory[existingItemIndex].stockStatus = updatedStatus;
             if (binLocation) warehouse.inventory[existingItemIndex].binLocation = binLocation;
             if (sku) warehouse.inventory[existingItemIndex].sku = sku;
             if (packagingUnit) warehouse.inventory[existingItemIndex].packagingUnit = packagingUnit;
@@ -593,46 +616,86 @@ const updateStockTransferStatus = async (req, res, next) => {
             return next(new ApiError(`طلب المناقلة غير موجود: ${transferId}`, 404));
         }
 
-        if (status === "approved" || status === "completed") {
-            // Apply balance shifts between warehouses
-            const fromWh = await Warehouse.findById(transfer.fromWarehouse);
-            const toWh = await Warehouse.findById(transfer.toWarehouse);
+        // 1. If approving, only record approval without shifting stock yet
+        if (status === "approved") {
+            transfer.status = "approved";
+            transfer.approvedBy = approvedBy || req.user?.name || "مدير العمليات اللوجستية";
+        }
 
-            if (fromWh && toWh) {
-                transfer.items.forEach((item) => {
-                    // Deduct from fromWarehouse
+        // 2. If completing, check source stock and move stock exactly once
+        if (status === "completed") {
+            if (!transfer.isStockApplied) {
+                const fromWh = await Warehouse.findById(transfer.fromWarehouse);
+                const toWh = await Warehouse.findById(transfer.toWarehouse);
+
+                if (!fromWh || !toWh) {
+                    return next(new ApiError("أحد المستودعات المحددة في المناقلة لم يعد موجوداً", 404));
+                }
+
+                // A. Validate sufficient stock for ALL items in source warehouse FIRST
+                for (const item of transfer.items) {
                     const fromItem = fromWh.inventory.find(
                         (inv) => inv.product.toString() === item.product.toString()
                     );
-                    if (fromItem) {
-                        fromItem.currentStock = Math.max(0, (fromItem.currentStock || 0) - item.quantity);
+                    const availableStock = fromItem ? (fromItem.currentStock || 0) : 0;
+                    if (availableStock < item.quantity) {
+                        const prodName = item.productName || "صنف غير مسمى";
+                        return next(
+                            new ApiError(
+                                `فشل تنفيذ المناقلة: رصيد المنتج (${prodName}) في المستودع المصدر (${fromWh.name}) غير كافٍ. المتوفر حالياً: ${availableStock}، والكمية المطلوبة: ${item.quantity}`,
+                                400
+                            )
+                        );
                     }
+                }
 
-                    // Add to toWarehouse
+                // B. Deduct from source and add to destination safely
+                transfer.items.forEach((item) => {
+                    const fromItem = fromWh.inventory.find(
+                        (inv) => inv.product.toString() === item.product.toString()
+                    );
+                    fromItem.currentStock -= item.quantity;
+                    if (fromItem.currentStock === 0) fromItem.stockStatus = "نفد الرصيد";
+                    else if (fromItem.currentStock <= (fromItem.reorderLevel || 50)) fromItem.stockStatus = "رصيد حرج (إعادة طلب)";
+
                     const toItem = toWh.inventory.find(
                         (inv) => inv.product.toString() === item.product.toString()
                     );
                     if (toItem) {
                         toItem.currentStock = (toItem.currentStock || 0) + item.quantity;
+                        if (toItem.currentStock > (toItem.reorderLevel || 50) * 3) toItem.stockStatus = "متوفر بكثافة";
+                        else toItem.stockStatus = "متوفر";
                     } else {
                         toWh.inventory.push({
                             product: item.product,
                             productName: item.productName || "",
-                            packagingUnit: item.unit || "وحدة",
+                            packagingUnit: item.unit || "بستلة",
                             binLocation: "A-01-P01",
                             currentStock: item.quantity,
                             reorderLevel: 50,
+                            stockStatus: "متوفر",
                         });
                     }
                 });
 
                 await fromWh.save();
                 await toWh.save();
+
+                transfer.isStockApplied = true;
+                transfer.completedAt = new Date();
             }
-            transfer.completedAt = new Date();
+            transfer.status = "completed";
         }
 
-        transfer.status = status || transfer.status;
+        // 3. Prevent cancelling an already applied transfer
+        if ((status === "cancelled" || status === "rejected") && transfer.isStockApplied) {
+            return next(new ApiError("لا يمكن إلغاء أمر المناقلة بعد أن تم ترحيل ونقل المخزون فعلياً بين المستودعات", 400));
+        }
+
+        if (status && status !== "completed" && status !== "approved") {
+            transfer.status = status;
+        }
+
         if (approvedBy) transfer.approvedBy = approvedBy;
         await transfer.save();
 
@@ -647,7 +710,7 @@ const updateStockTransferStatus = async (req, res, next) => {
 };
 
 // ==========================================
-// 12. Export Inventory Report Data (تصدير تقرير المخزون Excel / JSON)
+// 12. Export Inventory Report Data (تصدير تقرير المخزون CSV / JSON)
 // ==========================================
 const exportInventoryReport = async (req, res, next) => {
     try {
@@ -680,10 +743,79 @@ const exportInventoryReport = async (req, res, next) => {
             });
         });
 
+        // Check if client requested CSV file download
+        const isCsvRequested =
+            req.query.format === "csv" ||
+            req.query.download === "true" ||
+            (req.headers.accept && req.headers.accept.includes("text/csv"));
+
+        if (isCsvRequested) {
+            const escapeCsv = (val) => {
+                if (val === null || val === undefined) return '""';
+                const str = String(val).replace(/"/g, '""');
+                return `"${str}"`;
+            };
+
+            const headers = [
+                "المستودع",
+                "كود المستودع",
+                "المحافظة",
+                "مسؤول المستودع",
+                "المنتج",
+                "كود المنتج (SKU)",
+                "التصنيف",
+                "موقع التخزين",
+                "وحدة التعبئة",
+                "الرصيد الحالي",
+                "حد إعادة الطلب",
+                "حالة المخزون",
+                "حرج",
+            ].map(escapeCsv).join(",");
+
+            const rows = reportRows.map((r) =>
+                [
+                    escapeCsv(r.warehouseName),
+                    escapeCsv(r.warehouseCode),
+                    escapeCsv(r.governorate),
+                    escapeCsv(r.supervisorName),
+                    escapeCsv(r.productName),
+                    escapeCsv(r.sku),
+                    escapeCsv(r.category),
+                    escapeCsv(r.binLocation),
+                    escapeCsv(r.packagingUnit),
+                    escapeCsv(r.currentStock),
+                    escapeCsv(r.reorderLevel),
+                    escapeCsv(
+                        r.stockStatus === "in_stock"
+                            ? "متوفر"
+                            : r.stockStatus === "low_stock"
+                            ? "منخفض"
+                            : "نفذ"
+                    ),
+                    escapeCsv(r.isCritical ? "نعم" : "لا"),
+                ].join(",")
+            );
+
+            // Explicit UTF-8 Byte Order Mark (BOM) Buffer so Excel opens Arabic properly
+            const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
+            const textBuffer = Buffer.from([headers, ...rows].join("\r\n"), "utf-8");
+            const csvBuffer = Buffer.concat([bom, textBuffer]);
+
+            const filename = `inventory-report-${new Date().toISOString().slice(0, 10)}.csv`;
+
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+            return res.status(200).send(csvBuffer);
+        }
+
+        const host = req.get("host") || "localhost:8400";
+        const protocol = req.protocol || "http";
+
         res.status(200).json({
             status: "success",
             generatedAt: new Date().toISOString(),
             totalRecords: reportRows.length,
+            downloadCsvUrl: `${protocol}://${host}/api/v1/warehouses/export?format=csv`,
             data: reportRows,
         });
     } catch (error) {

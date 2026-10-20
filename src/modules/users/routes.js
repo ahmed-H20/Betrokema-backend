@@ -1,4 +1,5 @@
 const express = require("express");
+const { protect, allowedTo } = require("../../middlewares/auth");
 const {
     createUser,
     getAllUsers,
@@ -8,6 +9,8 @@ const {
 } = require("./services");
 
 const router = express.Router();
+
+router.use(protect, allowedTo("admin"));
 
 router.route("/")
     .get(getAllUsers)
