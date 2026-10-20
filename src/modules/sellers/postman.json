@@ -1,0 +1,283 @@
+{
+  "info": {
+    "_postman_id": "9d0e1f23-c4e5-5f60-0b12-345678901abc",
+    "name": "بترو كيما - مناديب المبيعات والعملاء (Sales Reps & Field Clients API)",
+    "description": "مجموعة طلبات Postman تغطي كافة متطلبات شاشة مناديب المبيعات والعملاء الميدانيين: كروت الـ 4 KPIs، القائمة الجانبية مع التارجت ونسبة الإنجاز، بانر ملف المندوب ومؤشرات الأداء المالي، ومحفظة عملاء المندوب مع الائتمان والمديونيات.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8400",
+      "type": "string"
+    },
+    {
+      "key": "SELLER_ID",
+      "value": "671158a12c4b5d6e7f890222",
+      "type": "string"
+    },
+    {
+      "key": "CLIENT_ID",
+      "value": "671158a12c4b5d6e7f890111",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. مؤشرات الأداء والـ KPIs (Dashboard Stats)",
+      "item": [
+        {
+          "name": "كروت إحصائيات المناديب والفريق (Top 4 KPIs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers/stats",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers", "stats"]
+            },
+            "description": "يرجع: إجمالي المناديب المعتمدين وتوزيعهم (نشط/معلق/إجازة)، إجمالي مبيعات الفريق ومستهدف الشهر ونسبة النمو، نسبة تحقيق التارجت العام وعدد الأيام للإغلاق، والعملاء الميدانيين النشطين."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. قائمة المناديب وتتبع الأداء (Sellers List & Filters)",
+      "item": [
+        {
+          "name": "عرض قائمة المناديب كاملة مع التارجت ونسب الإنجاز",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers?sort=performance",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "performance",
+                  "description": "ترتيب حسب الأداء (نسبة الإنجاز)"
+                }
+              ]
+            },
+            "description": "يجلب عناصر القائمة الجانبية: كود المندوب، حالته، مبيعاته، مستهدفه، نسبة الإنجاز، عدد عملائه، وفواتيره."
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة المناديب حسب المحافظة",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers?governorate=القاهرة",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers"],
+              "query": [
+                { "key": "governorate", "value": "القاهرة" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "بحث في المناديب بالاسم أو الكود",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers?search=أحمد",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers"],
+              "query": [
+                { "key": "search", "value": "أحمد" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. كارت ملف المندوب ومؤشرات الأداء (Selected Seller Profile)",
+      "item": [
+        {
+          "name": "مؤشرات الأداء المالي للمندوب (Banner Metrics)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers/{{SELLER_ID}}/performance",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers", "{{SELLER_ID}}", "performance"]
+            },
+            "description": "يجلب بيانات البانر للمندوب المحدد: مبيعات الشهر الحالي (480,000 ج.م)، نسبة الإنجاز (87.2%)، العمولات المستحقة (28,800 ج.م)، معدل التحصيل المالي (91%)، عدد العملاء والفواتير."
+          },
+          "response": []
+        },
+        {
+          "name": "تفاصيل المندوب الأساسية (Get Seller Details)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers", "{{SELLER_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. محفظة عملاء المندوب (Seller Clients Portfolio)",
+      "item": [
+        {
+          "name": "جدول عملاء المندوب المحدد (Portfolio Table)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/clients/seller/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "clients", "seller", "{{SELLER_ID}}"]
+            },
+            "description": "يجلب جدول 'محفظة عملاء المندوب': اسم المنشأة، المسؤول والهاتف، حد الائتمان، المديونية الحالية، وحالة الدفع (منتظم، تجاوز الائتمان، رصيد ممتاز، خالص)."
+          },
+          "response": []
+        },
+        {
+          "name": "إضافة عميل جديد للمندوب (+ إضافة عميل)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"شركة الأفق للمقاولات والدهانات\",\n  \"organizeName\": \"شركة الأفق للمقاولات العامة\",\n  \"contactPerson\": \"م. طارق السعدني\",\n  \"phone\": \"01004569920\",\n  \"seller\": \"{{SELLER_ID}}\",\n  \"governorate\": \"القاهرة\",\n  \"city\": \"التجمع الخامس\",\n  \"address\": \"مجمع البنوك - القاهرة الجديدة\",\n  \"creditLimit\": 250000,\n  \"currentDebt\": 64200,\n  \"paymentStatus\": \"regular\",\n  \"commercialType\": \"مقاولو التشطيبات\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/clients",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "clients"]
+            },
+            "description": "زر '+ إضافة عميل للمندوب' في هيدر جدول المحفظة."
+          },
+          "response": []
+        },
+        {
+          "name": "تحديث حد الائتمان والمديونية (Update Credit & Debt)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"creditLimit\": 250000,\n  \"currentDebt\": 98400,\n  \"paymentStatus\": \"over_credit\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/clients/{{CLIENT_ID}}/credit-debt",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "clients", "{{CLIENT_ID}}", "credit-debt"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. فواتير المندوب (Seller Invoices Tab)",
+      "item": [
+        {
+          "name": "فواتير المندوب وسجلات التحصيل (Invoices Tab 52)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/seller/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "seller", "{{SELLER_ID}}"]
+            },
+            "description": "يجلب فواتير المندوب لملء تبويب 'فواتير المندوب والتحصيل (52)'."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. إدارة المناديب الأساسية (Seller CRUD)",
+      "item": [
+        {
+          "name": "تسجيل مندوب جديد (+ تسجيل مندوب جديد)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"م. أحمد خليل إبراهيم\",\n  \"phone\": \"01094821109\",\n  \"title\": \"مندوب أول - دهانات إنشائية\",\n  \"governorate\": \"القاهرة\",\n  \"region\": \"التجمع الخامس، النرجس، والرحاب\",\n  \"sector\": \"قطاع الدلتا والقاهرة\",\n  \"city\": \"القاهرة\",\n  \"address\": \"التجمع الخامس\",\n  \"monthlyTarget\": 550000,\n  \"commissionRate\": 6,\n  \"status\": \"ACTIVE\",\n  \"certifiedSince\": 2021\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers"]
+            },
+            "description": "زر '+ تسجيل مندوب جديد' في أعلى الشاشة."
+          },
+          "response": []
+        },
+        {
+          "name": "تعديل بيانات المندوب (Edit Seller)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"monthlyTarget\": 600000,\n  \"region\": \"التجمع الخامس والرحاب والشروق\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers", "{{SELLER_ID}}"]
+            },
+            "description": "زر 'تعديل البيانات' في كارت المندوب."
+          },
+          "response": []
+        },
+        {
+          "name": "حذف مندوب (Delete Seller)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/sellers/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "sellers", "{{SELLER_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

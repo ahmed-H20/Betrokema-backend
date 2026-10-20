@@ -1,0 +1,344 @@
+{
+  "info": {
+    "_postman_id": "7b8f9e01-a2c3-4d5e-8f90-123456789abc",
+    "name": "بترو كيما - وحدة الفواتير والتحصيلات (Invoices & Collections API)",
+    "description": "مجموعة طلبات Postman تغطي كافة الميزات والـ APIs الخاصة بإدارة الفواتير، التحصيلات، لوحة المؤشرات (KPIs)، تسجيل الدفعات، والبحث المتقدم.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8400",
+      "type": "string"
+    },
+    {
+      "key": "INVOICE_ID",
+      "value": "671158a12c4b5d6e7f890123",
+      "type": "string"
+    },
+    {
+      "key": "CLIENT_ID",
+      "value": "671158a12c4b5d6e7f890111",
+      "type": "string"
+    },
+    {
+      "key": "SELLER_ID",
+      "value": "671158a12c4b5d6e7f890222",
+      "type": "string"
+    },
+    {
+      "key": "PRODUCT_ID",
+      "value": "671158a12c4b5d6e7f890333",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. مؤشرات الأداء والـ KPIs (Dashboard Stats)",
+      "item": [
+        {
+          "name": "إحصائيات الفواتير والتحصيلات (KPIs Cards + Tab Counts)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/stats",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "stats"]
+            },
+            "description": "يجلب إجمالي فواتير الشهر ونسبة النمو، التحصيل اليومي المستهدف والمحصل الفعلي، ديون المتأخرات، وعدادات التبويبات الأربعة (الكل، قيد المراجعة، تم التسليم، ملغاة)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. استعراض الفواتير والبحث والفلترة (Invoices Table & Filters)",
+      "item": [
+        {
+          "name": "عرض كافة الفواتير (Default List with Pagination)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?page=1&limit=10&sort=-createdAt",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "sort", "value": "-createdAt" }
+              ]
+            },
+            "description": "جلب قائمة الفواتير مع Populate لبيانات العميل، المندوب، والمنتجات، وبيانات الترقيم."
+          },
+          "response": []
+        },
+        {
+          "name": "البحث المركب (Search by Keyword)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?search=أحمد",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "أحمد",
+                  "description": "يبحث برقم الفاتورة، اسم الشركة، كود العميل، أو اسم المندوب"
+                }
+              ]
+            },
+            "description": "بحث ذكي يطابق خانة البحث الموحدة في أعلى الجدول."
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب التبويب / حالة الطلب (Filter by orderStatus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?orderStatus=pending",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                {
+                  "key": "orderStatus",
+                  "value": "pending",
+                  "description": "الخيارات: pending (قيد الطلب والمراجعة), completed (تم التسليم والفوترة), cancelled (ملغاة أو مرتجعة)"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب حالة السداد (Filter by paymentStatus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?paymentStatus=partially_paid",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                {
+                  "key": "paymentStatus",
+                  "value": "partially_paid",
+                  "description": "الخيارات: paid, partially_paid, unpaid, overdue"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب المستودع / الفرع (Filter by Warehouse)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?warehouse=العاشر من رمضان",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                {
+                  "key": "warehouse",
+                  "value": "العاشر من رمضان",
+                  "description": "مثل: كافة المستودعات (المركزية), العاشر من رمضان, مستودع 6 أكتوبر"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب الشهر (Filter by Month)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices?month=2024-10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"],
+              "query": [
+                { "key": "month", "value": "2024-10" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. تفاصيل الفاتورة والعمليات الأساسية (Invoice CRUD & Details)",
+      "item": [
+        {
+          "name": "عرض تفاصيل فاتورة محددة (Get Invoice Details by ID)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/{{INVOICE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "{{INVOICE_ID}}"]
+            },
+            "description": "يرجع كافة تفاصيل الفاتورة لملء النافذة المنبثقة: بيانات العميل والمندوب، جدول المنتجات، إجمالي المدفوع، المتبقي، وسجل الدفعات."
+          },
+          "response": []
+        },
+        {
+          "name": "إنشاء فاتورة جديدة (Create Invoice)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"client\": \"{{CLIENT_ID}}\",\n  \"seller\": \"{{SELLER_ID}}\",\n  \"invoiceCode\": \"INV-2024-0891\",\n  \"warehouse\": \"العاشر من رمضان\",\n  \"orderStatus\": \"pending\",\n  \"paymentStatus\": \"unpaid\",\n  \"dueDate\": \"2024-11-15T00:00:00.000Z\",\n  \"taxAmount\": 18200,\n  \"products\": [\n    {\n      \"productId\": \"{{PRODUCT_ID}}\",\n      \"price\": 1800,\n      \"quantity\": 45,\n      \"unit\": \"برميل\",\n      \"totalPrice\": 81000\n    },\n    {\n      \"productId\": \"{{PRODUCT_ID}}\",\n      \"price\": 1450,\n      \"quantity\": 35,\n      \"unit\": \"شيكارة\",\n      \"totalPrice\": 50750\n    },\n    {\n      \"productId\": \"{{PRODUCT_ID}}\",\n      \"price\": 900,\n      \"quantity\": 15,\n      \"unit\": \"جالون\",\n      \"totalPrice\": 13500\n    }\n  ],\n  \"totalPrice\": 148250,\n  \"notes\": \"طلبية مواد عزل وبويات خاصة بمشروع الأفق\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تعديل فاتورة (Update Invoice)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"تم تحديث موعد التوريد بناءً على طلب العميل\",\n  \"dueDate\": \"2024-11-20T00:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/{{INVOICE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "{{INVOICE_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف فاتورة (Delete Invoice)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/{{INVOICE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "{{INVOICE_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. الإجراءات السريعة (Quick Actions)",
+      "item": [
+        {
+          "name": "اعتماد توريد / تحديث حالة الفاتورة (Update Order Status)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderStatus\": \"completed\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/{{INVOICE_ID}}/status",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "{{INVOICE_ID}}", "status"]
+            },
+            "description": "تشغيل زر 'اعتماد توريد' الموجود في كل سطر بالجدول لتغيير الحالة فوراً إلى processing أو completed."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. التحصيلات وتسجيل الدفعات (Payments & Collections)",
+      "item": [
+        {
+          "name": "تسجيل دفعة جديدة (Add Payment to Invoice)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 40000,\n  \"paymentMethod\": \"bank_transfer\",\n  \"paymentType\": \"installment\",\n  \"receiverName\": \"الخزينة المركزية\",\n  \"paymentDate\": \"2024-10-24T14:15:00.000Z\",\n  \"notes\": \"تحويل QNB، حساب رقم 4901-CUST عند تسليم الرصيف\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/{{INVOICE_ID}}/payments",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "{{INVOICE_ID}}", "payments"]
+            },
+            "description": "زر '+ تسجيل دفعة جديدة' الموجود بأسفل النافذة المنبثقة. يقوم بإضافة الدفعة إلى سجل المدفوعات وتحديث totalPaid وحالة السداد آلياً (paid / partially_paid)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. إحصائيات المندوبين (Seller Performance)",
+      "item": [
+        {
+          "name": "فواتير مندوب محدد (Get Orders for Seller)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/seller/{{SELLER_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "seller", "{{SELLER_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "أرباح ومبيعات المندوب مع فلتر التاريخ (Seller Profit by Date)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/invoices/seller/{{SELLER_ID}}/profit?startDate=2024-10-01&endDate=2024-10-31",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "invoices", "seller", "{{SELLER_ID}}", "profit"],
+              "query": [
+                { "key": "startDate", "value": "2024-10-01" },
+                { "key": "endDate", "value": "2024-10-31" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

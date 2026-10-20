@@ -1,0 +1,329 @@
+{
+  "info": {
+    "_postman_id": "8c9d0e12-b3d4-4e5f-9a01-234567890def",
+    "name": "بترو كيما - المنتجات والتصنيفات (Products & Categories API)",
+    "description": "مجموعة طلبات Postman تغطي كافة متطلبات شاشة إدارة المنتجات والتصنيفات: كروت الـ KPIs الأربعة، تصنيفات المنتجات وأعدادها، البانر المميز، كروت المنتجات، التعديل السريع للسعر والمخزون، وطلبات التوريد الفورية.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8400",
+      "type": "string"
+    },
+    {
+      "key": "CATEGORY_ID",
+      "value": "6ad46765ee8cbb0cfd80894a",
+      "type": "string"
+    },
+    {
+      "key": "PRODUCT_ID",
+      "value": "671158a12c4b5d6e7f890555",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. مؤشرات المخزون (Inventory Stats & KPIs)",
+      "item": [
+        {
+          "name": "كروت إحصائيات المخزون الأربعة (Dashboard Stats)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/stats",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "stats"]
+            },
+            "description": "يرجع: إجمالي المنتجات المسجلة والربع سنوية، قيمة المخزون الإجمالية وعدد المستودعات، عدد تنبيهات المخزون الحرجة وقائمة المنتجات القاربة على النفاد، وعدد التصنيفات."
+          },
+          "response": []
+        },
+        {
+          "name": "المنتج الأكثر مبيعاً / المميز للبانر (Featured Hero Product)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/featured",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "featured"]
+            },
+            "description": "يجلب منتج البانر الأزرق العلوي (مثل: خيمة ستار 20000 سوبركوت)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. إدارة التصنيفات (Categories)",
+      "item": [
+        {
+          "name": "عرض التصنيفات مع أعداد المنتجات (Categories with Counts)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/categories",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "categories"]
+            },
+            "description": "يجلب قائمة التصنيفات لعمود 'التصنيفات المعتمدة' مع عدد المنتجات التابعة لكل تصنيف لعرضها في تبويبات الفلترة."
+          },
+          "response": []
+        },
+        {
+          "name": "إضافة تصنيف جديد سريع (Add New Category)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"دهانات الحماية والعزل\",\n  \"nameEn\": \"Protection & Waterproofing\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/categories",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "categories"]
+            },
+            "description": "فورم إضافة تصنيف جديد سريع في العمود الأيمن."
+          },
+          "response": []
+        },
+        {
+          "name": "حذف تصنيف معتمد (Delete Category)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/categories/{{CATEGORY_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "categories", "{{CATEGORY_ID}}"]
+            },
+            "description": "زر سلة المهملات بجانب التصنيف في قائمة التصنيفات المعتمدة."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. استعراض المنتجات والبحث والفلترة (Products List & Filters)",
+      "item": [
+        {
+          "name": "عرض كافة المنتجات مع الترقيم (All Products)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products?page=1&limit=10&sort=-createdAt",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "sort", "value": "-createdAt" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "البحث الذكي (Search by Name, Code, Description)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products?search=خيمة",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "search", "value": "خيمة" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب التصنيف (Filter by Category)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products?category={{CATEGORY_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "category", "value": "{{CATEGORY_ID}}" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة الأصناف القاربة على النفاد (Filter Low Stock Alerts)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products?isLowStock=true",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "isLowStock", "value": "true" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة حسب المستودع (Filter by Warehouse)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products?warehouse=مستودع العاشر",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"],
+              "query": [
+                { "key": "warehouse", "value": "مستودع العاشر" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. تفاصيل المنتج والعمليات الأساسية (Product CRUD)",
+      "item": [
+        {
+          "name": "عرض تفاصيل منتج محدد (Get Product by ID)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/{{PRODUCT_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "{{PRODUCT_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "إضافة منتج جديد كامل (Create Product)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"خيمة ستار 20000 سوبر كوت\",\n  \"code\": \"#PK-20000\",\n  \"category\": \"{{CATEGORY_ID}}\",\n  \"description\": \"دهان مائي أكريليكي فائق النقاء، مخصص للمباني الساحلية والصناعية\",\n  \"warehouse\": \"مستودع العاشر\",\n  \"quantity\": 412,\n  \"minStockThreshold\": 50,\n  \"isBestSeller\": true,\n  \"statusBadge\": \"مطابق للمواصفات\",\n  \"fetures\": [\n    { \"name\": \"مقاوم للأشعة UV\" },\n    { \"name\": \"ثبات ألوان 10 سنوات\" },\n    { \"name\": \"عزل 100%\" }\n  ],\n  \"packages\": [\n    {\n      \"unitName\": \"سعر الجالون (3.75 لتر)\",\n      \"price\": 320,\n      \"oldPrice\": 350,\n      \"discountPercent\": 8.5,\n      \"weight\": \"3.75 لتر\"\n    },\n    {\n      \"unitName\": \"سعر البستلة (14 لتر)\",\n      \"price\": 1180,\n      \"oldPrice\": 1250,\n      \"discountPercent\": 5.6,\n      \"weight\": \"14 لتر\"\n    }\n  ],\n  \"price\": {\n    \"galon\": 320,\n    \"bestela\": 1180\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "تعديل المنتج بالكامل (Update Product)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"دهان مائي أكريليكي عالي الجودة بمواصفات مطورة\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/{{PRODUCT_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "{{PRODUCT_ID}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "حذف منتج (Delete Product)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/{{PRODUCT_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "{{PRODUCT_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. الإجراءات السريعة (Quick Actions)",
+      "item": [
+        {
+          "name": "تعديل السعر والمخزون السريع (Quick Stock & Price Update)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 450,\n  \"price\": {\n    \"galon\": 330,\n    \"bestela\": 1200\n  }\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/{{PRODUCT_ID}}/stock-price",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "{{PRODUCT_ID}}", "stock-price"]
+            },
+            "description": "زر 'تعديل السعر والمخزون' الموجود في أسفل كل كارت منتج."
+          },
+          "response": []
+        },
+        {
+          "name": "إصدار طلب توريد فوري (Quick Supply Request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"requestedQuantity\": 150,\n  \"notes\": \"طلب توريد عاجل بسبب اقتراب نفاد المخزون\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/products/{{PRODUCT_ID}}/supply-order",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "products", "{{PRODUCT_ID}}", "supply-order"]
+            },
+            "description": "الزر الأحمر 'إصدار طلب توريد فوري' الذي يظهر على المنتجات القاربة على النفاد."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

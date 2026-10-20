@@ -1,0 +1,402 @@
+{
+  "info": {
+    "_postman_id": "8e1f2a34-b5c6-7d8e-9f01-456789012cde",
+    "name": "بترو كيما - إدارة وإعداد المخازن والمستودعات (Warehouses & Inventory API)",
+    "description": "مجموعة طلبات Postman المتكاملة لتغطية شاشة إدارة المخازن والمستودعات (SCREEN_4): مؤشرات الـ KPIs العلوية، شبكة بطاقات المستودعات الإقليمية ونسب الإشغال، نموذج إضافة وتعديل المستودع، جدول توزيع المنتجات ومواقع الأرفف (binLocation)، أوامر المناقلات المعلقة، وتصدير تقرير المخزون.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "BASE_URL",
+      "value": "http://localhost:8400",
+      "type": "string"
+    },
+    {
+      "key": "WAREHOUSE_ID",
+      "value": "6ad4adf8da40664b1c0aa9e0",
+      "type": "string"
+    },
+    {
+      "key": "PRODUCT_ID",
+      "value": "6ad467c77e87fed647d3489f",
+      "type": "string"
+    },
+    {
+      "key": "ITEM_ID",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "TRANSFER_ID",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. مؤشرات الـ KPIs العلوية (Top 3 KPI Cards)",
+      "item": [
+        {
+          "name": "إحصائيات ومؤشرات لوحة المخازن (Top 3 KPIs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/stats",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "stats"]
+            },
+            "description": "يرجع مؤشرات الكروت الثلاثة: 1. إجمالي المستودعات وأسماء الفروع (العاشر، السادات، برج العرب، أسيوط)، 2. رصيد المنتجات والكيماويات الإجمالي ونسبة الإشغال وسعة البالتات، 3. عدد طلبات المناقلة المعلقة والأرصدة الحرجة."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. إدارة المستودعات الإقليمية (Regional Warehouses CRUD)",
+      "item": [
+        {
+          "name": "عرض كافة المستودعات المعتمدة (الكل 4)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses"]
+            },
+            "description": "يرجع قائمة المستودعات كاملة مع نسبة الإشغال (occupancyRate%)، المنتجات المربوطة (linkedProductsCount)، والرصيد الفعلي الإجمالي (actualStockUnits)."
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة المستودعات النشطة فقط (نشط 3)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses?filter=active",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses"],
+              "query": [
+                {
+                  "key": "filter",
+                  "value": "active"
+                }
+              ]
+            },
+            "description": "عرض المستودعات المفعلة فقط والتي تستقبل حركات مخزنية."
+          },
+          "response": []
+        },
+        {
+          "name": "البحث في المستودعات (بالاسم، الكود، أو المحافظة)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses?search=العاشر",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "العاشر"
+                }
+              ]
+            },
+            "description": "بحث ديناميكي بالاسم أو الكود أو المحافظة."
+          },
+          "response": []
+        },
+        {
+          "name": "عرض تفاصيل مستودع محدد",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}"]
+            },
+            "description": "جلب تفاصيل المستودع بما فيها المخزون الداخلي وتفاصيل المنتجات."
+          },
+          "response": []
+        },
+        {
+          "name": "إضافة مستودع جديد (نموذج إضافة مخزن جديد)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"مستودع السويس اللوجستي الدولي\",\n  \"code\": \"WH-EGY-SUZ-05\",\n  \"governorate\": \"السويس\",\n  \"address\": \"المنطقة الحرة، قطاع الأدبية، بلوك 14\",\n  \"supervisorName\": \"م. كريم عبد الفتاح\",\n  \"supervisorPhone\": \"+20 101 234 5678\",\n  \"emergencyPhone\": \"+20 100 000 0005\",\n  \"capacityPallets\": 2000,\n  \"occupiedPallets\": 400,\n  \"operatingClassification\": \"مستودع رئيسي\",\n  \"isActive\": true,\n  \"status\": \"نشط\",\n  \"notes\": \"مخصص لخدمة شحنات التصدير وموانئ البحر الأحمر\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses"]
+            },
+            "description": "إنشاء مخزن جديد متوافق مع الحقول الإلزامية والاختيارية في فورم الواجهة."
+          },
+          "response": []
+        },
+        {
+          "name": "تعديل بيانات مستودع",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"capacityPallets\": 2200,\n  \"occupiedPallets\": 1950,\n  \"status\": \"نشط\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}"]
+            },
+            "description": "تحديث السعة الاستيعابية، الطاقة المستغلة، أو بيانات أمين العهدة."
+          },
+          "response": []
+        },
+        {
+          "name": "حذف مستودع",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}"]
+            },
+            "description": "حذف المستودع بالكامل من النظام."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. جدول توزيع المنتجات والكميات (Warehouse Stock & Bins Table)",
+      "item": [
+        {
+          "name": "عرض أصناف المستودع المختار (جدول توزيع المنتجات والكميات)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory?page=1&limit=10",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "يرجع بيانات الجدول: المنتج والتوصيف الفني، كود الصنف (SKU)، وحدة التعبئة، موقع الرف والتخزين (binLocation)، الرصيد الفعلي الحالي، حد إعادة الطلب، وحالة التوفر."
+          },
+          "response": []
+        },
+        {
+          "name": "البحث في جدول المخزون (بالاسم أو كود الصنف)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory?search=خيمة",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "خيمة"
+                }
+              ]
+            },
+            "description": "بحث بالاسم أو SKU داخل مخزون المستودع المختار."
+          },
+          "response": []
+        },
+        {
+          "name": "فلترة المنتجات ذات الرصيد الحرج (إعادة طلب)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory?status=critical",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "critical"
+                }
+              ]
+            },
+            "description": "فلترة الأصناف التي وصلت لحد إعادة الطلب الحرج لاتخاذ إجراء الشراء أو المناقلة."
+          },
+          "response": []
+        },
+        {
+          "name": "+ تخصيص منتج للمخزن (إسناد صنف وموقع رف)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productId\": \"{{PRODUCT_ID}}\",\n  \"sku\": \"PT-20K-WHT\",\n  \"packagingUnit\": \"بستلة 14 لتر\",\n  \"binLocation\": \"A-12-P01\",\n  \"currentStock\": 4850,\n  \"reorderLevel\": 500,\n  \"notes\": \"طلاء مائي أكريليكي عالي التغطية والتحمل\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory"]
+            },
+            "description": "إسناد وتخصيص منتج داخل المستودع مع تحديد موقعه الداخلي (الممر والبالتة) والأرصدة."
+          },
+          "response": []
+        },
+        {
+          "name": "تعديل موقع الرف والكميات المخزنية لصنف",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"binLocation\": \"A-12-P02\",\n  \"currentStock\": 5000,\n  \"reorderLevel\": 600\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory/{{ITEM_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory", "{{ITEM_ID}}"]
+            },
+            "description": "تعديل سريع لموقع الرف أو الرصيد الفعلي أو حد إعادة الطلب."
+          },
+          "response": []
+        },
+        {
+          "name": "إلغاء تخصيص صنف من المستودع",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/{{WAREHOUSE_ID}}/inventory/{{ITEM_ID}}",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "{{WAREHOUSE_ID}}", "inventory", "{{ITEM_ID}}"]
+            },
+            "description": "حذف صنف من مخزون المستودع."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. أوامر المناقلات المخزنية (Stock Transfers)",
+      "item": [
+        {
+          "name": "عرض قائمة طلبات المناقلة المعلقة والمكتملة",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "transfers"]
+            },
+            "description": "عرض كافة أوامر المناقلة بين المستودعات."
+          },
+          "response": []
+        },
+        {
+          "name": "إنشاء طلب مناقلة بين مستودعين",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fromWarehouse\": \"{{WAREHOUSE_ID}}\",\n  \"toWarehouse\": \"6ad4adf8da40664b1c0aa9e1\",\n  \"items\": [\n    {\n      \"product\": \"{{PRODUCT_ID}}\",\n      \"productName\": \"خيمة ستار 20000 مطفي فاخر\",\n      \"quantity\": 100,\n      \"unit\": \"بستلة 14 لتر\"\n    }\n  ],\n  \"requestedBy\": \"مسؤول اللوجستيات والتوزيع\",\n  \"notes\": \"مناقلة لتعزيز رصيد مستودع السادات\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/transfers",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "transfers"]
+            },
+            "description": "إنشاء أمر مناقلة جديد ينتقل لحالة pending."
+          },
+          "response": []
+        },
+        {
+          "name": "اعتماد أمر المناقلة وتحديث الأرصدة تلقائياً",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"approved\",\n  \"approvedBy\": \"مدير العمليات المركزية\"\n}"
+            },
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/transfers/{{TRANSFER_ID}}/status",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "transfers", "{{TRANSFER_ID}}", "status"]
+            },
+            "description": "اعتماد الطلب يخصم الكميات من المستودع المصدر ويضيفها للمستودع الوجهة تلقائياً."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. تصدير تقرير المخزون (Excel / Report Export)",
+      "item": [
+        {
+          "name": "تصدير تقرير المخزون الشامل (تصدير Excel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{BASE_URL}}/api/v1/warehouses/export",
+              "host": ["{{BASE_URL}}"],
+              "path": ["api", "v1", "warehouses", "export"]
+            },
+            "description": "يرجع تقرير المخزون الشامل لكافة المستودعات مصنفاً بالأصناف، مواقع الأرفف، وحدات التعبئة، وحالة التوفر لتصديره لملف Excel."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
