@@ -8,17 +8,21 @@ const {
     createSeller,
     updateSeller,
     deleteSeller,
+    resetSellerPassword,
 } = require("./services");
 
 const router = express.Router();
 
-// 1. Overall Team Stats (Admin / Manager only)
+// 1. Reset Seller Password (Admin / Manager only)
+router.post("/:id/reset-password", protect, allowedTo("admin", "manager"), resetSellerPassword);
+
+// 2. Overall Team Stats (Admin / Manager only)
 router.get("/stats", protect, allowedTo("admin", "manager"), getSellersDashboardStats);
 
-// 2. Selected Seller Detailed Performance (Admin / Manager or the Seller themselves)
+// 3. Selected Seller Detailed Performance (Admin / Manager or the Seller themselves)
 router.get("/:id/performance", protect, allowedTo("admin", "manager", "seller"), getSellerPerformance);
 
-// 3. Standard List and CRUD
+// 4. Standard List and CRUD
 router.route("/")
     .get(protect, allowedTo("admin", "manager"), getAllSellers)
     .post(protect, allowedTo("admin", "manager"), createSeller);

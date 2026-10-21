@@ -226,6 +226,80 @@ const getClientById = async (req, res, next) => {
     }
 };
 
+// 8. Reset Client Password (Admin, Manager, or Assigned Seller)
+const resetClientPassword = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const client = await Client.findById(id);
+        if (!client) {
+            return next(new ApiError("العميل غير موجود", 404));
+        }
+
+        // Check authorization if requester is a seller
+        if (req.user && req.user.role === "seller") {
+            const sellerId = req.user.sellerProfile?._id
+                ? req.user.sellerProfile._id.toString()
+                : req.user.sellerProfile?.toString();
+
+            const clientSellerId = client.seller ? client.seller.toString() : null;
+
+            if (!sellerId || clientSellerId !== sellerId) {
+                return next(new ApiError("غير مصرح لك بإعادة تعيين كلمة مرور عميل غير مسند إليك", 403));
+            }
+        }
+
+        // Locate associated user
+        let user = null;
+        if (client.user) {
+            user = await User.findById(client.user);
+        }
+        if (!user && client.clientCode) {
+            user = await User.findOne({ code: client.clientCode });
+        }
+        if (!user && client.phone) {
+            user = await User.findOne({ phone: client.phone, role: "client" });
+        }
+
+        const newPassword = req.body?.password || generateEasyPassword();
+
+        if (user) {
+            user.password = newPassword;
+            if (!user.clientProfile) {
+                user.clientProfile = client._id;
+            }
+            await user.save();
+        } else {
+            const clientCode = client.clientCode || `CLI-${Date.now().toString().slice(-4)}`;
+            user = await User.create({
+                name: client.name || client.organizeName,
+                code: clientCode,
+                phone: client.phone,
+                email: `${clientCode.toLowerCase()}@petrokema.local`,
+                password: newPassword,
+                role: "client",
+                clientProfile: client._id,
+            });
+            client.user = user._id;
+            client.clientCode = clientCode;
+            await client.save();
+        }
+
+        res.status(200).json({
+            status: "success",
+            message: "تم إعادة تعيين كلمة مرور العميل بنجاح",
+            credentials: {
+                name: client.name || client.organizeName,
+                code: user.code || client.clientCode,
+                password: newPassword,
+                phone: client.phone,
+                role: "client",
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     createClient,
     updateClient,
@@ -234,4 +308,5 @@ module.exports = {
     getClientsForSeller,
     updateClientCreditDebt,
     getClientById,
+    resetClientPassword,
 };

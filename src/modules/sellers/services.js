@@ -439,6 +439,68 @@ const deleteSeller = async (req, res, next) => {
     }
 };
 
+// ==========================================
+// 8. Reset Seller Password (Admin / Manager only)
+// ==========================================
+const resetSellerPassword = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const seller = await Seller.findById(id);
+        if (!seller) {
+            return next(new ApiError("المندوب غير موجود", 404));
+        }
+
+        let user = null;
+        if (seller.user) {
+            user = await User.findById(seller.user);
+        }
+        if (!user && seller.code) {
+            user = await User.findOne({ code: seller.code });
+        }
+        if (!user && seller.phone) {
+            user = await User.findOne({ phone: seller.phone, role: "seller" });
+        }
+
+        const newPassword = req.body?.password || generateEasyPassword();
+
+        if (user) {
+            user.password = newPassword;
+            if (!user.sellerProfile) {
+                user.sellerProfile = seller._id;
+            }
+            await user.save();
+        } else {
+            const sellerCode = seller.code || `PK-${Date.now().toString().slice(-4)}`;
+            user = await User.create({
+                name: seller.name,
+                code: sellerCode,
+                phone: seller.phone,
+                email: `${sellerCode.toLowerCase()}@petrokema.local`,
+                password: newPassword,
+                role: "seller",
+                sellerProfile: seller._id,
+            });
+            seller.user = user._id;
+            seller.code = sellerCode;
+            await seller.save();
+        }
+
+        res.status(200).json({
+            status: "success",
+            message: "تم إعادة تعيين كلمة مرور المندوب بنجاح",
+            credentials: {
+                name: seller.name,
+                code: user.code || seller.code,
+                password: newPassword,
+                phone: seller.phone,
+                role: "seller",
+            },
+        });
+    } catch (err) {
+        next(err);
+    }
+};
+
 module.exports = {
     getSellersDashboardStats,
     getAllSellers,
@@ -447,4 +509,5 @@ module.exports = {
     createSeller,
     updateSeller,
     deleteSeller,
+    resetSellerPassword,
 };

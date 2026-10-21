@@ -8,17 +8,21 @@ const {
     getClientsForSeller,
     updateClientCreditDebt,
     getClientById,
+    resetClientPassword,
 } = require("./services");
 
 const router = express.Router();
 
-// 1. Seller Clients Portfolio (Admin / Manager / Seller)
+// 1. Reset Client Password (Admin, Manager, or Assigned Seller)
+router.post("/:id/reset-password", protect, allowedTo("admin", "manager", "seller"), resetClientPassword);
+
+// 2. Seller Clients Portfolio (Admin / Manager / Seller)
 router.get("/seller/:sellerId", protect, allowedTo("admin", "manager", "seller"), getClientsForSeller);
 
-// 2. Quick Action: Update Credit Limit and Debt
+// 3. Quick Action: Update Credit Limit and Debt
 router.patch("/:id/credit-debt", protect, allowedTo("admin", "manager", "seller"), updateClientCreditDebt);
 
-// 3. Standard List and CRUD
+// 4. Standard List and CRUD
 router.route("/")
     .get(protect, allowedTo("admin", "manager", "seller"), getAllClients)
     .post(optionalAuth, createClient);

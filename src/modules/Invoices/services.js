@@ -16,10 +16,19 @@ const getAllOrders = async (req, res, next) => {
         // Role-based scope (Clients only see their own orders, Sellers see their own assigned orders)
         if (req.user) {
             if (req.user.role === "client") {
-                filterObj.client = req.user.clientProfile?._id || req.user.clientProfile;
+                let clientId = req.user.clientProfile?._id || req.user.clientProfile;
+                if (!clientId) {
+                    const clientDoc = await Client.findOne({ user: req.user._id }).select("_id");
+                    if (clientDoc) clientId = clientDoc._id;
+                }
+                filterObj.client = clientId;
             } else if (req.user.role === "seller") {
                 filterObj.seller = req.user.sellerProfile?._id || req.user.sellerProfile;
             }
+        }
+
+        if (req.query.client && !filterObj.client) {
+            filterObj.client = req.query.client;
         }
 
         // 1. Warehouse filter
@@ -57,26 +66,30 @@ const getAllOrders = async (req, res, next) => {
         // 5. Intelligent Multi-field Search
         if (req.query.search) {
             const keyword = req.query.search.trim();
-            const matchingClients = await Client.find({
-                $or: [
-                    { name: { $regex: keyword, $options: "i" } },
-                    { organizeName: { $regex: keyword, $options: "i" } },
-                    { clientCode: { $regex: keyword, $options: "i" } },
-                ],
-            }).select("_id");
+            if (filterObj.client) {
+                filterObj.invoiceCode = { $regex: keyword, $options: "i" };
+            } else {
+                const matchingClients = await Client.find({
+                    $or: [
+                        { name: { $regex: keyword, $options: "i" } },
+                        { organizeName: { $regex: keyword, $options: "i" } },
+                        { clientCode: { $regex: keyword, $options: "i" } },
+                    ],
+                }).select("_id");
 
-            const matchingSellers = await Seller.find({
-                name: { $regex: keyword, $options: "i" },
-            }).select("_id");
+                const matchingSellers = await Seller.find({
+                    name: { $regex: keyword, $options: "i" },
+                }).select("_id");
 
-            const clientIds = matchingClients.map((c) => c._id);
-            const sellerIds = matchingSellers.map((s) => s._id);
+                const clientIds = matchingClients.map((c) => c._id);
+                const sellerIds = matchingSellers.map((s) => s._id);
 
-            filterObj.$or = [
-                { invoiceCode: { $regex: keyword, $options: "i" } },
-                { client: { $in: clientIds } },
-                { seller: { $in: sellerIds } },
-            ];
+                filterObj.$or = [
+                    { invoiceCode: { $regex: keyword, $options: "i" } },
+                    { client: { $in: clientIds } },
+                    { seller: { $in: sellerIds } },
+                ];
+            }
         }
 
         const totalCount = await Order.countDocuments(filterObj);
@@ -160,7 +173,15 @@ const createOrder = async (req, res, next) => {
         // Auto-assign client and seller if logged in as client
         if (req.user && req.user.role === "client") {
             req.body.client = req.user.clientProfile?._id || req.user.clientProfile;
-            if (!req.body.seller) {
+            if (!req.body.client) {
+                const clientDoc = await Client.findOne({ user: req.user._id }).select("_id seller");
+                if (clientDoc) {
+                    req.body.client = clientDoc._id;
+                    if (!req.body.seller && clientDoc.seller) {
+                        req.body.seller = clientDoc.seller;
+                    }
+                }
+            } else if (!req.body.seller) {
                 const clientDoc = await Client.findById(req.body.client);
                 if (clientDoc && clientDoc.seller) {
                     req.body.seller = clientDoc.seller;
