@@ -638,7 +638,9 @@ const getOrdersForClient = async (req, res, next) => {
     try {
         const orders = await Order.find({ client: req.params.clientId })
             .populate("seller")
-            .populate("products.productId");
+            .populate("client")
+            .populate("products.productId")
+            .sort({ createdAt: -1 });
         res.status(200).json({ status: "success", results: orders.length, data: orders });
     } catch (err) {
         next(err);

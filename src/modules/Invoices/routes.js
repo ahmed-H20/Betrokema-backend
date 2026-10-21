@@ -26,9 +26,9 @@ router.get("/analytics", optionalAuth, getExecutiveAnalytics);
 router.get("/seller/:sellerId", protect, allowedTo("admin", "manager", "seller"), getOrdersForSeller);
 router.get("/seller/:sellerId/profit", protect, allowedTo("admin", "manager", "seller"), getTotalProfitforSeller);
 
-// 3. Client specific routes (Admin / Manager / Client)
-router.get("/client/:clientId", protect, allowedTo("admin", "manager", "client"), getOrdersForClient);
-router.get("/client/:clientId/profit", protect, allowedTo("admin", "manager", "client"), getTotalProfitforClient);
+// 3. Client specific routes (Admin / Manager / Seller / Client)
+router.get("/client/:clientId", protect, allowedTo("admin", "manager", "seller", "client"), getOrdersForClient);
+router.get("/client/:clientId/profit", protect, allowedTo("admin", "manager", "seller", "client"), getTotalProfitforClient);
 
 // 4. Status Action & Payment Sub-resources
 router.patch("/:id/status", protect, allowedTo("admin", "manager", "seller"), updateOrderStatus);
