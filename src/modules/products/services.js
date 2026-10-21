@@ -224,6 +224,23 @@ const syncPricingAndPackages = (body) => {
         }
     }
 
+    // Support both 'fetures' and 'features' array of strings or objects
+    if (data.features && (!data.fetures || data.fetures.length === 0)) {
+        if (Array.isArray(data.features)) {
+            data.fetures = data.features.map((f) => {
+                if (typeof f === "string") return { name: f.trim() };
+                if (f && typeof f === "object" && f.name) return { name: f.name.trim() };
+                return null;
+            }).filter((f) => f && f.name);
+        }
+    } else if (Array.isArray(data.fetures)) {
+        data.fetures = data.fetures.map((f) => {
+            if (typeof f === "string") return { name: f.trim() };
+            if (f && typeof f === "object" && f.name) return { name: f.name.trim() };
+            return null;
+        }).filter((f) => f && f.name);
+    }
+
     return data;
 };
 
@@ -411,4 +428,5 @@ module.exports = {
     quickSupplyRequest,
     deleteProduct,
     getProductsByCategory,
+    syncPricingAndPackages,
 };
