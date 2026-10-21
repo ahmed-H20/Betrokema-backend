@@ -736,12 +736,15 @@ const getExecutiveAnalytics = async (req, res, next) => {
         const overdueAmount = overdueAgg[0]?.overdueAmount || 0;
         const overdueCount = overdueAgg[0]?.overdueCount || 0;
 
-        // 3. Last 6 Months Revenue Trend
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        // 3. Complete Revenue Trend (Continuous Timeline with zero-fill)
+        const trendStartDate = period === "year"
+            ? new Date(now.getFullYear(), 0, 1)
+            : new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
         const monthlyTrendAgg = await Order.aggregate([
             {
                 $match: {
-                    createdAt: { $gte: sixMonthsAgo },
+                    createdAt: { $gte: trendStartDate },
                     orderStatus: { $ne: "cancelled" },
                 },
             },
@@ -758,6 +761,45 @@ const getExecutiveAnalytics = async (req, res, next) => {
             },
             { $sort: { "_id.year": 1, "_id.month": 1 } },
         ]);
+
+        const aggMap = new Map();
+        monthlyTrendAgg.forEach((m) => {
+            const key = `${m._id.year}-${m._id.month}`;
+            aggMap.set(key, m);
+        });
+
+        const continuousTrend = [];
+        if (period === "year") {
+            const currYear = now.getFullYear();
+            for (let m = 1; m <= 12; m++) {
+                const key = `${currYear}-${m}`;
+                const found = aggMap.get(key);
+                continuousTrend.push({
+                    year: currYear,
+                    month: m,
+                    label: `${currYear}-${String(m).padStart(2, "0")}`,
+                    revenue: found ? found.revenue : 0,
+                    collected: found ? found.collected : 0,
+                    ordersCount: found ? found.ordersCount : 0,
+                });
+            }
+        } else {
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const yr = d.getFullYear();
+                const mo = d.getMonth() + 1;
+                const key = `${yr}-${mo}`;
+                const found = aggMap.get(key);
+                continuousTrend.push({
+                    year: yr,
+                    month: mo,
+                    label: `${yr}-${String(mo).padStart(2, "0")}`,
+                    revenue: found ? found.revenue : 0,
+                    collected: found ? found.collected : 0,
+                    ordersCount: found ? found.ordersCount : 0,
+                });
+            }
+        }
 
         // 4. Sector / Territory Distribution
         const sectorAgg = await Order.aggregate([
@@ -891,14 +933,7 @@ const getExecutiveAnalytics = async (req, res, next) => {
                     overdueAmount,
                     overdueCount,
                 },
-                monthlyTrend: monthlyTrendAgg.map((m) => ({
-                    year: m._id.year,
-                    month: m._id.month,
-                    label: `${m._id.year}-${String(m._id.month).padStart(2, "0")}`,
-                    revenue: m.revenue,
-                    collected: m.collected,
-                    ordersCount: m.ordersCount,
-                })),
+                monthlyTrend: continuousTrend,
                 sectors: sectorAgg.map((s) => ({
                     sector: s._id,
                     revenue: s.revenue,
