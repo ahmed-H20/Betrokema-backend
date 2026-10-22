@@ -191,14 +191,27 @@ const createOrder = async (req, res, next) => {
 
         const code = await generateCode(Order, "INV");
 
-        // Validate and calculate accurate totalPrice from line items
+        // Validate and calculate accurate totalPrice from line items using fixed DB prices & discounts
         let calculatedProductsTotal = 0;
         if (Array.isArray(req.body.products)) {
-            req.body.products.forEach((item) => {
+            for (const item of req.body.products) {
+                if (item.productId) {
+                    const prod = await Product.findById(item.productId);
+                    if (prod && Array.isArray(prod.packages) && prod.packages.length > 0) {
+                        const matchedPkg =
+                            prod.packages.find((p) => p.unitName === item.unit) || prod.packages[0];
+                        if (matchedPkg) {
+                            item.price = Number(matchedPkg.price);
+                            item.oldPrice = Number(matchedPkg.oldPrice || 0);
+                            item.discountPercent = Number(matchedPkg.discountPercent || 0);
+                            item.unit = item.unit || matchedPkg.unitName;
+                        }
+                    }
+                }
                 const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
                 item.totalPrice = itemTotal;
                 calculatedProductsTotal += itemTotal;
-            });
+            }
         }
 
         const taxAmount = Number(req.body.taxAmount) || 0;
@@ -236,6 +249,29 @@ const createOrder = async (req, res, next) => {
 // ==========================================
 const updateOrder = async (req, res, next) => {
     try {
+        if (Array.isArray(req.body.products)) {
+            let calculatedProductsTotal = 0;
+            for (const item of req.body.products) {
+                if (item.productId) {
+                    const prod = await Product.findById(item.productId);
+                    if (prod && Array.isArray(prod.packages) && prod.packages.length > 0) {
+                        const matchedPkg =
+                            prod.packages.find((p) => p.unitName === item.unit) || prod.packages[0];
+                        if (matchedPkg) {
+                            item.price = Number(matchedPkg.price);
+                            item.oldPrice = Number(matchedPkg.oldPrice || 0);
+                            item.discountPercent = Number(matchedPkg.discountPercent || 0);
+                            item.unit = item.unit || matchedPkg.unitName;
+                        }
+                    }
+                }
+                const itemTotal = Number(item.price || 0) * Number(item.quantity || 1);
+                item.totalPrice = itemTotal;
+                calculatedProductsTotal += itemTotal;
+            }
+            const taxAmount = Number(req.body.taxAmount) || 0;
+            req.body.totalPrice = calculatedProductsTotal + taxAmount;
+        }
         const order = await Order.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true,

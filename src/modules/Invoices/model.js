@@ -89,6 +89,16 @@ const orderProductSchema = new mongoose.Schema(
             min: [0, "Price cannot be negative"],
         },
 
+        oldPrice: {
+            type: Number,
+            default: 0,
+        },
+
+        discountPercent: {
+            type: Number,
+            default: 0,
+        },
+
         quantity: {
             type: Number,
             required: true,
