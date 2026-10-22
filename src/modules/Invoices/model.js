@@ -209,6 +209,12 @@ const orderSchema = new mongoose.Schema(
             trim: true,
             default: "",
         },
+
+        invoiceImageUrl: {
+            type: String,
+            trim: true,
+            default: "",
+        },
     },
     {
         timestamps: true,
