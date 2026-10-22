@@ -1,33 +1,76 @@
+const { cloudinary, isCloudinaryConfigured } = require("../../config/cloudinary");
 const ApiError = require("../../utils/ApiError");
 
-// Helper to format file response with both relative path and full URL
-const formatFileResponse = (req, file) => {
-    // Relative path normalized to POSIX slashes (e.g., /uploads/products/file-123.png)
-    const relativePart = file.path.split(/uploads[\\/]/)[1];
-    const relativePath = `/uploads/${relativePart}`.replace(/\\/g, "/");
+/**
+ * Upload buffer directly to Cloudinary using upload_stream
+ * Works in serverless environments (e.g. Vercel) without writing to disk
+ */
+const uploadBufferToCloudinary = (buffer, originalName, folder = "general", resourceType = "auto") => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            {
+                folder: `petrokema/${folder}`,
+                resource_type: resourceType,
+                public_id: `${folder}-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+            },
+            (error, result) => {
+                if (error) return reject(error);
+                resolve(result);
+            }
+        );
+        stream.end(buffer);
+    });
+};
 
-    const protocol = req.protocol || "http";
-    const host = req.get("host") || "localhost:8400";
-    const fullUrl = `${protocol}://${host}${relativePath}`;
-
+/**
+ * Fallback to base64 Data URL if Cloudinary is not configured or encounters permission issues
+ */
+const fallbackBufferToDataUrl = (file) => {
+    const base64 = file.buffer.toString("base64");
+    const dataUrl = `data:${file.mimetype};base64,${base64}`;
+    const filename = `data-${Date.now()}`;
     return {
-        filename: file.filename,
+        secure_url: dataUrl,
+        public_id: filename,
+    };
+};
+
+// Helper to format consistent file response
+const formatUploadResult = (file, uploadedResult) => {
+    return {
+        filename: uploadedResult.public_id || file.originalname,
         originalName: file.originalname,
         mimetype: file.mimetype,
         size: file.size,
-        path: relativePath,
-        url: fullUrl,
+        path: uploadedResult.secure_url,
+        url: uploadedResult.secure_url,
     };
 };
 
 // 1. Single File Upload
-const uploadSingleFile = (req, res, next) => {
+const uploadSingleFile = async (req, res, next) => {
     try {
         if (!req.file) {
             return next(new ApiError("لم يتم إرسال أي ملف للرفع", 400));
         }
 
-        const fileData = formatFileResponse(req, req.file);
+        let type = req.query.type || req.body?.type || "general";
+        type = String(type).replace(/[^a-zA-Z0-9_-]/g, "") || "general";
+
+        let result;
+        if (isCloudinaryConfigured()) {
+            try {
+                const resourceType = req.file.mimetype === "application/pdf" ? "raw" : "image";
+                result = await uploadBufferToCloudinary(req.file.buffer, req.file.originalname, type, resourceType);
+            } catch (cloudErr) {
+                console.error("Cloudinary upload failed, using fallback:", cloudErr.message || cloudErr);
+                result = fallbackBufferToDataUrl(req.file);
+            }
+        } else {
+            result = fallbackBufferToDataUrl(req.file);
+        }
+
+        const fileData = formatUploadResult(req.file, result);
 
         res.status(201).json({
             status: "success",
@@ -37,18 +80,37 @@ const uploadSingleFile = (req, res, next) => {
             path: fileData.path,
         });
     } catch (err) {
-        next(err);
+        next(new ApiError(`فشل في معالجة الملف: ${err.message || err}`, 500));
     }
 };
 
 // 2. Multiple Files Upload
-const uploadMultipleFiles = (req, res, next) => {
+const uploadMultipleFiles = async (req, res, next) => {
     try {
         if (!req.files || req.files.length === 0) {
             return next(new ApiError("لم يتم إرسال أي ملفات للرفع", 400));
         }
 
-        const filesData = req.files.map((f) => formatFileResponse(req, f));
+        let type = req.query.type || req.body?.type || "general";
+        type = String(type).replace(/[^a-zA-Z0-9_-]/g, "") || "general";
+
+        const uploadPromises = req.files.map(async (file) => {
+            let result;
+            if (isCloudinaryConfigured()) {
+                try {
+                    const resourceType = file.mimetype === "application/pdf" ? "raw" : "image";
+                    result = await uploadBufferToCloudinary(file.buffer, file.originalname, type, resourceType);
+                } catch (cloudErr) {
+                    console.error("Cloudinary upload failed for file, using fallback:", cloudErr.message || cloudErr);
+                    result = fallbackBufferToDataUrl(file);
+                }
+            } else {
+                result = fallbackBufferToDataUrl(file);
+            }
+            return formatUploadResult(file, result);
+        });
+
+        const filesData = await Promise.all(uploadPromises);
 
         res.status(201).json({
             status: "success",
@@ -59,7 +121,7 @@ const uploadMultipleFiles = (req, res, next) => {
             paths: filesData.map((f) => f.path),
         });
     } catch (err) {
-        next(err);
+        next(new ApiError(`فشل في معالجة الملفات: ${err.message || err}`, 500));
     }
 };
 

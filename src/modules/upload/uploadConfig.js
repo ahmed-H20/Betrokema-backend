@@ -1,6 +1,4 @@
 const multer = require("multer");
-const path = require("path");
-const fs = require("fs");
 const ApiError = require("../../utils/ApiError");
 
 // Allowed mime types (Images & Documents)
@@ -14,30 +12,8 @@ const ALLOWED_MIME_TYPES = [
     "application/pdf",
 ];
 
-// Base storage directory: <ServerRoot>/uploads
-const UPLOADS_BASE_DIR = path.join(__dirname, "../../../uploads");
-
-// Multer Disk Storage with automatic subfolder creation
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        let subfolder = req.query.type || req.body?.type || "general";
-        subfolder = String(subfolder).replace(/[^a-zA-Z0-9_-]/g, "");
-        if (!subfolder) subfolder = "general";
-
-        const targetDir = path.join(UPLOADS_BASE_DIR, subfolder);
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
-        }
-        cb(null, targetDir);
-    },
-    filename: (req, file, cb) => {
-        let prefix = req.query.type || req.body?.type || "file";
-        prefix = String(prefix).replace(/[^a-zA-Z0-9_-]/g, "");
-        const ext = path.extname(file.originalname).toLowerCase();
-        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        cb(null, `${prefix}-${uniqueSuffix}${ext}`);
-    },
-});
+// Memory storage for serverless environments (Vercel) & direct Cloudinary streaming
+const storage = multer.memoryStorage();
 
 // File Filter
 const fileFilter = (req, file, cb) => {
@@ -64,5 +40,5 @@ const upload = multer({
 
 module.exports = {
     upload,
-    UPLOADS_BASE_DIR,
+    ALLOWED_MIME_TYPES,
 };
