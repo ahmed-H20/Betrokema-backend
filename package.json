@@ -17,7 +17,8 @@
   "scripts": {
     "test": "npm run jest",
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "seed:admin": "node createAdmin.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
