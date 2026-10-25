@@ -302,6 +302,20 @@ const syncPricingAndPackages = (body) => {
         };
     }
 
+    if (Array.isArray(data.colors)) {
+        data.colors = data.colors
+            .map((c) => {
+                if (!c || typeof c !== "object") return null;
+                const name = typeof c.name === "string" ? c.name.trim() : "";
+                const code = typeof c.code === "string" ? c.code.trim() : "";
+                const hex = typeof c.hex === "string" && c.hex.trim() ? c.hex.trim() : "#FFFFFF";
+                const price = Math.max(0, Number(c.price) || 0);
+                if (!name) return null;
+                return { name, code, hex, price };
+            })
+            .filter(Boolean);
+    }
+
     return data;
 };
 
@@ -392,6 +406,7 @@ const updateProductStockAndPrice = async (req, res, next) => {
         if (payload.priceAfterDiscount !== undefined) updateFields.priceAfterDiscount = payload.priceAfterDiscount;
         if (payload.weight !== undefined) updateFields.weight = payload.weight;
         if (payload.packages !== undefined) updateFields.packages = payload.packages;
+        if (payload.colors !== undefined) updateFields.colors = payload.colors;
 
         const product = await Product.findByIdAndUpdate(req.params.id, updateFields, {
             new: true,

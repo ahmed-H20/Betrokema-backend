@@ -200,9 +200,19 @@ const createOrder = async (req, res, next) => {
                     const prod = await Product.findById(item.productId);
                     if (prod && Array.isArray(prod.packages) && prod.packages.length > 0) {
                         const matchedPkg =
-                            prod.packages.find((p) => p.unitName === item.unit) || prod.packages[0];
+                            prod.packages.find((p) => {
+                                const displayName = p.weight ? `${p.unitName} (${p.weight})` : p.unitName;
+                                return displayName === item.unit || p.unitName === item.unit;
+                            }) || prod.packages[0];
                         if (matchedPkg) {
-                            item.price = Number(matchedPkg.price);
+                            let basePrice = Number(matchedPkg.price);
+                            if (item.color && Array.isArray(prod.colors)) {
+                                const matchedColor = prod.colors.find((c) => c.name === item.color);
+                                if (matchedColor) {
+                                    basePrice += Number(matchedColor.price || 0);
+                                }
+                            }
+                            item.price = basePrice;
                             item.oldPrice = Number(matchedPkg.oldPrice || 0);
                             item.discountPercent = Number(matchedPkg.discountPercent || 0);
                             item.unit = item.unit || matchedPkg.unitName;
@@ -274,9 +284,19 @@ const updateOrder = async (req, res, next) => {
                     const prod = await Product.findById(item.productId);
                     if (prod && Array.isArray(prod.packages) && prod.packages.length > 0) {
                         const matchedPkg =
-                            prod.packages.find((p) => p.unitName === item.unit) || prod.packages[0];
+                            prod.packages.find((p) => {
+                                const displayName = p.weight ? `${p.unitName} (${p.weight})` : p.unitName;
+                                return displayName === item.unit || p.unitName === item.unit;
+                            }) || prod.packages[0];
                         if (matchedPkg) {
-                            item.price = Number(matchedPkg.price);
+                            let basePrice = Number(matchedPkg.price);
+                            if (item.color && Array.isArray(prod.colors)) {
+                                const matchedColor = prod.colors.find((c) => c.name === item.color);
+                                if (matchedColor) {
+                                    basePrice += Number(matchedColor.price || 0);
+                                }
+                            }
+                            item.price = basePrice;
                             item.oldPrice = Number(matchedPkg.oldPrice || 0);
                             item.discountPercent = Number(matchedPkg.discountPercent || 0);
                             item.unit = item.unit || matchedPkg.unitName;

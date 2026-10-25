@@ -115,6 +115,12 @@ const orderProductSchema = new mongoose.Schema(
             default: "وحدة",
         },
 
+        color: {
+            type: String,
+            trim: true,
+            default: "",
+        },
+
         totalPrice: {
             type: Number,
             required: true,
