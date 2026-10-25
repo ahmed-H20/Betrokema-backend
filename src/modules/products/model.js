@@ -1,5 +1,31 @@
 const mongoose = require("mongoose");
 
+const colorSchema = new mongoose.Schema(
+    {
+        name: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        code: {
+            type: String,
+            default: "",
+            trim: true,
+        },
+        hex: {
+            type: String,
+            default: "#000000",
+            trim: true,
+        },
+        price: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+    },
+    { _id: false }
+);
+
 const packageSchema = new mongoose.Schema(
     {
         unitName: {
@@ -28,31 +54,9 @@ const packageSchema = new mongoose.Schema(
             type: String,
             default: "",
         },
-    },
-    { _id: false }
-);
-
-const colorSchema = new mongoose.Schema(
-    {
-        name: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        code: {
-            type: String,
-            default: "",
-            trim: true,
-        },
-        hex: {
-            type: String,
-            default: "#FFFFFF",
-            trim: true,
-        },
-        price: {
-            type: Number,
-            default: 0,
-            min: 0,
+        colors: {
+            type: [colorSchema],
+            default: [],
         },
     },
     { _id: false }

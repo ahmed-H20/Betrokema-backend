@@ -192,7 +192,20 @@ const syncPricingAndPackages = (body) => {
             const discountPercent = Number(pkg.discountPercent) || 0;
             const weight = typeof pkg.weight === "string" ? pkg.weight.trim() : (pkg.weight ? pkg.weight.toString() : "");
             const note = typeof pkg.note === "string" ? pkg.note.trim() : "";
-            return { unitName, price, oldPrice, discountPercent, weight, note };
+            const colors = Array.isArray(pkg.colors)
+                ? pkg.colors
+                      .map((c) => {
+                          if (!c || typeof c !== "object") return null;
+                          const name = typeof c.name === "string" ? c.name.trim() : "";
+                          const code = typeof c.code === "string" ? c.code.trim() : "";
+                          const hex = typeof c.hex === "string" && c.hex.trim() ? c.hex.trim() : "#000000";
+                          const colorPrice = Math.max(0, Number(c.price) || 0);
+                          if (!name) return null;
+                          return { name, code, hex, price: colorPrice };
+                      })
+                      .filter(Boolean)
+                : [];
+            return { unitName, price, oldPrice, discountPercent, weight, note, colors };
         }).filter((pkg) => pkg.unitName && pkg.price > 0);
 
         data.packages.forEach((pkg) => {
@@ -308,12 +321,32 @@ const syncPricingAndPackages = (body) => {
                 if (!c || typeof c !== "object") return null;
                 const name = typeof c.name === "string" ? c.name.trim() : "";
                 const code = typeof c.code === "string" ? c.code.trim() : "";
-                const hex = typeof c.hex === "string" && c.hex.trim() ? c.hex.trim() : "#FFFFFF";
+                const hex = typeof c.hex === "string" && c.hex.trim() ? c.hex.trim() : "#000000";
                 const price = Math.max(0, Number(c.price) || 0);
                 if (!name) return null;
                 return { name, code, hex, price };
             })
             .filter(Boolean);
+    } else {
+        data.colors = [];
+    }
+
+    if (data.colors.length === 0 && Array.isArray(data.packages)) {
+        const aggregated = [];
+        const seen = new Set();
+        data.packages.forEach((pkg) => {
+            if (Array.isArray(pkg.colors)) {
+                pkg.colors.forEach((c) => {
+                    if (c && c.name && !seen.has(c.name)) {
+                        seen.add(c.name);
+                        aggregated.push(c);
+                    }
+                });
+            }
+        });
+        if (aggregated.length > 0) {
+            data.colors = aggregated;
+        }
     }
 
     return data;

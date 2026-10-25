@@ -19,6 +19,7 @@ const userRouter = require("./src/modules/users/routes");
 const warehouseRouter = require("./src/modules/warehouses/routes");
 const uploadRouter = require("./src/modules/upload/routes");
 const notificationRouter = require("./src/modules/notifications/routes");
+const contactRouter = require("./src/modules/contact/routes");
 const path = require("path");
 
 const cors = require("cors");
@@ -48,6 +49,7 @@ app.use("/api/v1/users", userRouter);
 app.use("/api/v1/warehouses", warehouseRouter);
 app.use("/api/v1/upload", uploadRouter);
 app.use("/api/v1/notifications", notificationRouter);
+app.use("/api/v1/contact", contactRouter);
 
 app.use("/test", (req, res) => {
     res.json({ message: "hello world" });
