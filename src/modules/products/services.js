@@ -76,12 +76,19 @@ const getProductsDashboardStats = async (req, res, next) => {
 // ==========================================
 const getFeaturedProduct = async (req, res, next) => {
     try {
-        let product = await Product.findOne({ isBestSeller: true }).populate("category", "name nameEn code");
+        let product = await Product.findOne({ isBestSeller: true })
+            .populate("category", "name nameEn code")
+            .populate("giftProduct", "name code image images packages price");
         if (!product) {
-            product = await Product.findOne({ isFeatured: true }).populate("category", "name nameEn code");
+            product = await Product.findOne({ isFeatured: true })
+                .populate("category", "name nameEn code")
+                .populate("giftProduct", "name code image images packages price");
         }
         if (!product) {
-            product = await Product.findOne().sort({ quantity: -1 }).populate("category", "name nameEn code");
+            product = await Product.findOne()
+                .sort({ quantity: -1 })
+                .populate("category", "name nameEn code")
+                .populate("giftProduct", "name code image images packages price");
         }
 
         res.status(200).json({
@@ -132,7 +139,9 @@ const getAllProducts = async (req, res, next) => {
             .pagination(totalCount)
             .limitation();
 
-        const products = await features.mongooseQuery.populate("category", "name nameEn code");
+        const products = await features.mongooseQuery
+            .populate("category", "name nameEn code")
+            .populate("giftProduct", "name code image images packages price");
 
         res.status(200).json({
             status: "success",
@@ -151,7 +160,9 @@ const getAllProducts = async (req, res, next) => {
 // ==========================================
 const getProductById = async (req, res, next) => {
     try {
-        const product = await Product.findById(req.params.id).populate("category", "name nameEn code");
+        const product = await Product.findById(req.params.id)
+            .populate("category", "name nameEn code")
+            .populate("giftProduct", "name code image images packages price");
         if (!product) {
             return next(new ApiError(`المنتج غير موجود: ${req.params.id}`, 404));
         }
@@ -174,6 +185,16 @@ const syncPricingAndPackages = (body) => {
     data.weight = { ...(data.weight || {}) };
 
     if (Array.isArray(data.packages) && data.packages.length > 0) {
+        data.packages = data.packages.map((pkg) => {
+            const unitName = typeof pkg.unitName === "string" ? pkg.unitName.trim() : "";
+            const price = Number(pkg.price) || 0;
+            const oldPrice = Number(pkg.oldPrice) || 0;
+            const discountPercent = Number(pkg.discountPercent) || 0;
+            const weight = typeof pkg.weight === "string" ? pkg.weight.trim() : (pkg.weight ? pkg.weight.toString() : "");
+            const note = typeof pkg.note === "string" ? pkg.note.trim() : "";
+            return { unitName, price, oldPrice, discountPercent, weight, note };
+        }).filter((pkg) => pkg.unitName && pkg.price > 0);
+
         data.packages.forEach((pkg) => {
             const nameLower = (pkg.unitName || "").toLowerCase();
 
@@ -208,6 +229,19 @@ const syncPricingAndPackages = (body) => {
                 if (weightNum > 0) data.weight.bestela = weightNum;
             }
         });
+
+        // Sane fallback for price.bestela and price.galon
+        if (!data.price.bestela && data.packages.length > 0) {
+            data.price.bestela = data.packages[0].price;
+            data.priceAfterDiscount.bestela = data.packages[0].price;
+        }
+        if (!data.price.galon && data.packages.length > 1) {
+            data.price.galon = data.packages[1].price;
+            data.priceAfterDiscount.galon = data.packages[1].price;
+        } else if (!data.price.galon && data.packages.length > 0) {
+            data.price.galon = data.packages[0].price;
+            data.priceAfterDiscount.galon = data.packages[0].price;
+        }
     }
 
     // Fallbacks if price is sent directly
@@ -241,6 +275,33 @@ const syncPricingAndPackages = (body) => {
         }).filter((f) => f && f.name);
     }
 
+    if (data.giftProduct && typeof data.giftProduct === "object" && data.giftProduct._id) {
+        data.giftProduct = data.giftProduct._id;
+    } else if (data.giftProduct === "" || !data.giftProduct) {
+        data.giftProduct = null;
+    }
+    if (data.giftTitle !== undefined) {
+        data.giftTitle = typeof data.giftTitle === "string" ? data.giftTitle.trim() : "";
+    }
+    if (data.gift && typeof data.gift === "object") {
+        data.gift = {
+            name: typeof data.gift.name === "string" ? data.gift.name.trim() : "",
+            description: typeof data.gift.description === "string" ? data.gift.description.trim() : "",
+            image: typeof data.gift.image === "string" ? data.gift.image.trim() : "",
+            weight: typeof data.gift.weight === "string" ? data.gift.weight.trim() : "",
+        };
+        if (data.gift.name && !data.giftTitle) {
+            data.giftTitle = data.gift.name;
+        }
+    } else if (data.giftTitle) {
+        data.gift = {
+            name: data.giftTitle,
+            description: "",
+            image: "",
+            weight: "",
+        };
+    }
+
     return data;
 };
 
@@ -268,7 +329,9 @@ const createProduct = async (req, res, next) => {
 
         const code = await generateCode(Product, "PK");
         const product = await Product.create({ ...payload, code: code });
-        const populated = await Product.findById(product._id).populate("category", "name nameEn code");
+        const populated = await Product.findById(product._id)
+            .populate("category", "name nameEn code")
+            .populate("giftProduct", "name code image images packages price");
 
         res.status(201).json({
             status: "success",
@@ -297,7 +360,9 @@ const updateProduct = async (req, res, next) => {
         const product = await Product.findByIdAndUpdate(req.params.id, payload, {
             new: true,
             runValidators: true,
-        }).populate("category", "name nameEn code");
+        })
+            .populate("category", "name nameEn code")
+            .populate("giftProduct", "name code image images packages price");
 
         if (!product) {
             return next(new ApiError(`المنتج غير موجود: ${req.params.id}`, 404));

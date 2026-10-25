@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../modules/users/model");
+require("../modules/sellers/model");
+require("../modules/clients/model");
 const ApiError = require("../utils/ApiError");
 
 // 1. Verify Authentication Token (JWT)
@@ -24,7 +26,10 @@ const protect = async (req, res, next) => {
 
         const currentUser = await User.findById(decoded.id || decoded.userId)
             .populate("sellerProfile")
-            .populate("clientProfile");
+            .populate({
+                path: "clientProfile",
+                populate: { path: "seller", select: "name phone code title" },
+            });
 
         if (!currentUser) {
             return next(
@@ -83,7 +88,10 @@ const optionalAuth = async (req, res, next) => {
 
         const currentUser = await User.findById(decoded.id || decoded.userId)
             .populate("sellerProfile")
-            .populate("clientProfile");
+            .populate({
+                path: "clientProfile",
+                populate: { path: "seller", select: "name phone code title" },
+            });
 
         if (currentUser && currentUser.isActive !== false) {
             req.user = currentUser;

@@ -5,6 +5,7 @@ const Product = require("../products/model");
 const ApiFeatures = require("../../utils/ApiFeatures");
 const ApiError = require("../../utils/ApiError");
 const generateCode = require("../../utils/GenerateCode");
+const { sendNotification } = require("../notifications/service");
 
 // ==========================================
 // 1. Get All Orders (With Filtering, Search, Pagination & Populate)
@@ -215,8 +216,10 @@ const createOrder = async (req, res, next) => {
         }
 
         const taxAmount = Number(req.body.taxAmount) || 0;
-        const finalTotalPrice = calculatedProductsTotal + taxAmount;
+        const discountAmount = Math.max(0, Number(req.body.discountAmount) || 0);
+        const finalTotalPrice = Math.max(0, calculatedProductsTotal - discountAmount + taxAmount);
         req.body.totalPrice = finalTotalPrice > 0 ? finalTotalPrice : (Number(req.body.totalPrice) || 0);
+        req.body.discountAmount = discountAmount;
 
         if (req.body.totalPaid && Number(req.body.totalPaid) >= req.body.totalPrice) {
             req.body.paymentStatus = "paid";
@@ -234,6 +237,16 @@ const createOrder = async (req, res, next) => {
             .populate("seller")
             .populate("products.productId");
 
+        // Real-time Notification for new invoice
+        sendNotification({
+            role: "management",
+            title: "فاتورة مبيعات جديدة",
+            message: `تم إنشاء الفاتورة (${populated.invoiceCode || code}) بقيمة ${Number(populated.totalPrice || 0).toLocaleString("ar-EG")} ج.م ${populated.client?.name ? `للعميل: ${populated.client.name}` : ""}`,
+            type: "invoice",
+            relatedId: populated._id,
+            link: "/invoices",
+        }).catch(() => {});
+
         res.status(201).json({
             status: "success",
             message: "تم إنشاء الفاتورة بنجاح",
@@ -249,9 +262,14 @@ const createOrder = async (req, res, next) => {
 // ==========================================
 const updateOrder = async (req, res, next) => {
     try {
-        if (Array.isArray(req.body.products)) {
+        if (Array.isArray(req.body.products) || req.body.discountAmount !== undefined || req.body.taxAmount !== undefined) {
+            const existingOrder = await Order.findById(req.params.id);
+            if (!existingOrder) {
+                return next(new ApiError(`لا توجد فاتورة بهذا الرقم: ${req.params.id}`, 404));
+            }
             let calculatedProductsTotal = 0;
-            for (const item of req.body.products) {
+            const prods = Array.isArray(req.body.products) ? req.body.products : existingOrder.products;
+            for (const item of prods) {
                 if (item.productId) {
                     const prod = await Product.findById(item.productId);
                     if (prod && Array.isArray(prod.packages) && prod.packages.length > 0) {
@@ -269,8 +287,10 @@ const updateOrder = async (req, res, next) => {
                 item.totalPrice = itemTotal;
                 calculatedProductsTotal += itemTotal;
             }
-            const taxAmount = Number(req.body.taxAmount) || 0;
-            req.body.totalPrice = calculatedProductsTotal + taxAmount;
+            const discountAmount = req.body.discountAmount !== undefined ? Math.max(0, Number(req.body.discountAmount) || 0) : (existingOrder.discountAmount || 0);
+            const taxAmount = req.body.taxAmount !== undefined ? (Number(req.body.taxAmount) || 0) : (existingOrder.taxAmount || 0);
+            req.body.totalPrice = Math.max(0, calculatedProductsTotal - discountAmount + taxAmount);
+            req.body.discountAmount = discountAmount;
         }
         const order = await Order.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
@@ -361,6 +381,22 @@ const updateOrderStatus = async (req, res, next) => {
             .populate("client")
             .populate("seller");
 
+        const statusArabicMap = {
+            pending: "قيد الانتظار",
+            processing: "قيد التجهيز",
+            completed: "مكتملة",
+            cancelled: "ملغاة",
+        };
+
+        sendNotification({
+            role: "management",
+            title: "تحديث حالة الفاتورة",
+            message: `تم تغيير حالة الفاتورة (${populated.invoiceCode}) إلى "${statusArabicMap[orderStatus] || orderStatus}"`,
+            type: "invoice",
+            relatedId: populated._id,
+            link: "/invoices",
+        }).catch(() => {});
+
         res.status(200).json({
             status: "success",
             message: `تم تغيير حالة الفاتورة إلى ${orderStatus}`,
@@ -412,7 +448,12 @@ const addPaymentToInvoice = async (req, res, next) => {
             return next(new ApiError("هذه الفاتورة مسددة بالكامل بالفعل ولا توجد أي متبقيات للتحصيل", 400));
         }
 
-        if (paymentNum > remainingAmount) {
+        // Allow 1% surcharge when paymentMethod is wallet
+        const maxAllowed = paymentMethod === "wallet"
+            ? Math.ceil(remainingAmount * 1.015 * 100) / 100
+            : remainingAmount;
+
+        if (paymentNum > maxAllowed) {
             return next(
                 new ApiError(
                     `قيمة الدفعة (${paymentNum} ج.م) تتجاوز إجمالي المبلغ المتبقي على الفاتورة (${remainingAmount} ج.م)`,
@@ -421,7 +462,8 @@ const addPaymentToInvoice = async (req, res, next) => {
             );
         }
 
-        const newTotalPaid = currentPaid + paymentNum;
+        const effectiveSettlement = Math.min(paymentNum, remainingAmount);
+        const newTotalPaid = currentPaid + effectiveSettlement;
 
         // Add payment to payments array
         order.payments.push({
@@ -430,7 +472,7 @@ const addPaymentToInvoice = async (req, res, next) => {
             paymentType,
             referenceNumber: referenceNumber ? String(referenceNumber).trim() : "",
             chequeDueDate: chequeDueDate ? new Date(chequeDueDate) : null,
-            notes: notes || "",
+            notes: notes || (paymentMethod === "wallet" ? "تشمل رسوم تحصيل المحفظة الإلكترونية 1%" : ""),
             receivedBy: receivedBy || req.user?._id || null,
             receiverName: receiverName || req.user?.name || "الخزينة المركزية",
             paymentDate: paymentDate || new Date(),
@@ -452,7 +494,7 @@ const addPaymentToInvoice = async (req, res, next) => {
         if (order.client) {
             const clientDoc = await Client.findById(order.client);
             if (clientDoc) {
-                clientDoc.currentDebt = Math.max(0, (clientDoc.currentDebt || 0) - paymentNum);
+                clientDoc.currentDebt = Math.max(0, (clientDoc.currentDebt || 0) - effectiveSettlement);
                 if (clientDoc.currentDebt === 0) {
                     clientDoc.paymentStatus = "settled";
                 } else if (clientDoc.currentDebt <= (clientDoc.creditLimit || 0) && clientDoc.paymentStatus === "over_credit") {
@@ -467,6 +509,15 @@ const addPaymentToInvoice = async (req, res, next) => {
             .populate("seller")
             .populate("products.productId")
             .populate("payments.receivedBy");
+
+        sendNotification({
+            role: "management",
+            title: "تسجيل دفعة سداد جديدة",
+            message: `تم سداد مبلغ ${Number(paymentNum).toLocaleString("ar-EG")} ج.م للفاتورة (${populatedOrder.invoiceCode}) - الحالة: ${populatedOrder.paymentStatus === "paid" ? "مسددة بالكامل" : "مسددة جزئياً"}`,
+            type: "payment",
+            relatedId: populatedOrder._id,
+            link: "/invoices",
+        }).catch(() => {});
 
         res.status(201).json({
             status: "success",

@@ -1,5 +1,7 @@
 const express = require("express");
+const http = require("http");
 const dbConnecting = require("./src/config/database");
+const { initSocket } = require("./src/config/socket");
 const GlobalError = require("./src/middlewares/error");
 const ApiError = require("./src/utils/ApiError");
 const morgan = require("morgan");
@@ -16,6 +18,7 @@ const sellerRouter = require("./src/modules/sellers/routes");
 const userRouter = require("./src/modules/users/routes");
 const warehouseRouter = require("./src/modules/warehouses/routes");
 const uploadRouter = require("./src/modules/upload/routes");
+const notificationRouter = require("./src/modules/notifications/routes");
 const path = require("path");
 
 const cors = require("cors");
@@ -44,6 +47,7 @@ app.use("/api/v1/sellers", sellerRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/warehouses", warehouseRouter);
 app.use("/api/v1/upload", uploadRouter);
+app.use("/api/v1/notifications", notificationRouter);
 
 app.use("/test", (req, res) => {
     res.json({ message: "hello world" });
@@ -58,9 +62,14 @@ app.use((req, res, next) => {
 // Global Error Handling in Express
 app.use(GlobalError);
 
+// Create HTTP Server & initialize Socket.io
+const server = http.createServer(app);
+initSocket(server);
+
 // Server Start
-const server = app.listen(process.env.PORT || 3000, () => {
-    console.log(`Server is running on port ${process.env.PORT || 3000}`);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server is running with WebSockets on port ${PORT}`);
 });
 
 // Global Error Handling Outside Express
@@ -71,3 +80,7 @@ process.on("unhandledRejection", (err) => {
         process.exit(1);
     });
 });
+
+module.exports = app;
+
+

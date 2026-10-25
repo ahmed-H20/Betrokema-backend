@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../users/model");
+require("../sellers/model");
+require("../clients/model");
 const ApiError = require("../../utils/ApiError");
 
 // Generate JWT token helper
@@ -28,7 +30,7 @@ const login = async (req, res, next) => {
             );
         }
 
-        // Find user by code, email or phone
+        // Find user by code, email, or phone
         const user = await User.findOne({
             $or: [
                 { code: identifier },
@@ -38,7 +40,10 @@ const login = async (req, res, next) => {
         })
             .select("+password")
             .populate("sellerProfile")
-            .populate("clientProfile");
+            .populate({
+                path: "clientProfile",
+                populate: { path: "seller", select: "name phone code title" },
+            });
 
         if (!user) {
             return next(new ApiError("كود الحساب أو كلمة المرور غير صحيحة", 401));

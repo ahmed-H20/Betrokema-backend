@@ -99,6 +99,22 @@ const productSchema = new mongoose.Schema(
             type: [packageSchema],
             default: [],
         },
+        gift: {
+            name: { type: String, default: "", trim: true },
+            description: { type: String, default: "", trim: true },
+            image: { type: String, default: "", trim: true },
+            weight: { type: String, default: "", trim: true },
+        },
+        giftProduct: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Product",
+            default: null,
+        },
+        giftTitle: {
+            type: String,
+            default: "",
+            trim: true,
+        },
         // Backward-compatible fields
         price: {
             galon: { type: Number, default: 0 },

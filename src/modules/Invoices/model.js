@@ -204,6 +204,12 @@ const orderSchema = new mongoose.Schema(
             default: 0,
         },
 
+        discountAmount: {
+            type: Number,
+            default: 0,
+            min: [0, "Discount amount cannot be negative"],
+        },
+
         dueDate: {
             type: Date,
             default: null,
