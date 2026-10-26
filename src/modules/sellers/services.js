@@ -391,6 +391,27 @@ const updateSeller = async (req, res, next) => {
         if (!seller) {
             return next(new ApiError(`المندوب غير موجود: ${req.params.id}`, 404));
         }
+
+        // Synchronize User account active status
+        if (req.body.status) {
+            const isUserActive = req.body.status === "ACTIVE";
+            if (seller.user) {
+                await User.findByIdAndUpdate(seller.user, { isActive: isUserActive });
+            } else if (seller.code) {
+                await User.findOneAndUpdate({ code: seller.code }, { isActive: isUserActive });
+            }
+        }
+
+        // Update password if provided in body
+        if (req.body.password && req.body.password.trim().length >= 6) {
+            const userQuery = seller.user ? { _id: seller.user } : { code: seller.code };
+            const userDoc = await User.findOne(userQuery);
+            if (userDoc) {
+                userDoc.password = req.body.password.trim();
+                await userDoc.save();
+            }
+        }
+
         res.status(200).json({
             status: "success",
             message: "تم تحديث بيانات المندوب بنجاح",

@@ -1,6 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../users/model");
-require("../sellers/model");
+const Seller = require("../sellers/model");
 require("../clients/model");
 const ApiError = require("../../utils/ApiError");
 
@@ -60,6 +60,33 @@ const login = async (req, res, next) => {
             return next(
                 new ApiError("تم تعطيل هذا الحساب. يرجى مراجعة إدارة النظام", 403)
             );
+        }
+
+        // Check seller status if role is seller
+        if (user.role === "seller") {
+            const seller = user.sellerProfile || (await Seller.findOne({ user: user._id }));
+            if (seller) {
+                if (seller.status === "SUSPENDED") {
+                    return next(
+                        new ApiError(
+                            seller.statusNote
+                                ? `تم تعليق حساب المندوب (${seller.statusNote}). يرجى مراجعة إدارة الشركة`
+                                : "تم تعليق حساب هذا المندوب. يرجى مراجعة إدارة الشركة",
+                            403
+                        )
+                    );
+                }
+                if (seller.status === "VACATION") {
+                    return next(
+                        new ApiError(
+                            seller.statusNote
+                                ? `المندوب في فترة إجازة حالياً (${seller.statusNote}). الحساب متوقف مؤقتاً`
+                                : "المندوب في فترة إجازة حالياً. الحساب متوقف مؤقتاً حتى العودة للعمل",
+                            403
+                        )
+                    );
+                }
+            }
         }
 
         // Generate Token

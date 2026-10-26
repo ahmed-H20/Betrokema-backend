@@ -43,6 +43,30 @@ const protect = async (req, res, next) => {
             );
         }
 
+        if (currentUser.role === "seller" && currentUser.sellerProfile) {
+            const sellerStatus = currentUser.sellerProfile.status;
+            if (sellerStatus === "SUSPENDED") {
+                return next(
+                    new ApiError(
+                        currentUser.sellerProfile.statusNote
+                            ? `حساب المندوب معلق: ${currentUser.sellerProfile.statusNote}. يرجى مراجعة الإدارة`
+                            : "حساب المندوب معلق ولا يمكن إجراء عمليات في النظام",
+                        403
+                    )
+                );
+            }
+            if (sellerStatus === "VACATION") {
+                return next(
+                    new ApiError(
+                        currentUser.sellerProfile.statusNote
+                            ? `المندوب في فترة إجازة (${currentUser.sellerProfile.statusNote}) ولا يمكن إجراء عمليات حتى العودة للعمل`
+                            : "المندوب في فترة إجازة حالياً ولا يمكن إجراء عمليات",
+                        403
+                    )
+                );
+            }
+        }
+
         req.user = currentUser;
         next();
     } catch (err) {

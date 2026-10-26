@@ -190,6 +190,21 @@ const createOrder = async (req, res, next) => {
             }
         }
 
+        // Validate that assigned seller is ACTIVE
+        if (req.body.seller) {
+            const assignedSeller = await Seller.findById(req.body.seller);
+            if (assignedSeller && assignedSeller.status !== "ACTIVE") {
+                return next(
+                    new ApiError(
+                        assignedSeller.status === "SUSPENDED"
+                            ? `لا يمكن تسجيل فاتورة باسم المندوب (${assignedSeller.name}) لأن حسابه معلق`
+                            : `لا يمكن تسجيل فاتورة باسم المندوب (${assignedSeller.name}) لوجوده في فترة إجازة حالياً`,
+                        400
+                    )
+                );
+            }
+        }
+
         const code = await generateCode(Order, "INV");
 
         // Validate and calculate accurate totalPrice from line items using fixed DB prices & discounts
