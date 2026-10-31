@@ -121,6 +121,10 @@ const productSchema = new mongoose.Schema(
             type: String,
             default: "مطابق للمواصفات",
         },
+        sortOrder: {
+            type: Number,
+            default: 0,
+        },
         fetures: [
             {
                 name: String,

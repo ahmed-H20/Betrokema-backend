@@ -52,7 +52,7 @@ class ApiFeatures {
       const sortedBy = this.queryString.sort.split(",").join(" "); // for many fields
       this.mongooseQuery = this.mongooseQuery.sort(sortedBy);
     } else {
-      this.mongooseQuery = this.mongooseQuery.sort("-createdAt");
+      this.mongooseQuery = this.mongooseQuery.sort("sortOrder createdAt");
     }
 
     return this;
